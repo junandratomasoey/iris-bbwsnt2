@@ -33,11 +33,12 @@ class PetaController extends Controller
         $di = $this->kondisi->ringkasanDi($tgl)->values()
             ->map(fn ($d) => collect($d)->except(['sub_per_status', 'debit_total_lps'])->all());
 
-        $kejadian = Kejadian::with('kabupaten:id,nama')->whereNotNull('lat')->get()->map(fn ($k) => [
+        $kejadian = Kejadian::with('kabupaten:id,nama', 'foto')->whereNotNull('lat')->get()->map(fn ($k) => [
             'lat' => $k->lat, 'lng' => $k->lng, 'jenis' => $k->jenis_kegagalan, 'penyebab' => $k->penyebab,
             'desa' => $k->desa, 'kecamatan' => $k->kecamatan, 'kabupaten' => $k->kabupaten?->nama,
-            'luas_terdampak_ha' => (float) $k->luas_terdampak_ha, 'status' => $k->status_penanganan,
-            'warna' => Kejadian::STATUS[$k->status_penanganan] ?? '#9AA4A8',
+            'luas_terdampak_ha' => (float) $k->luas_terdampak_ha, 'luas_tertangani_ha' => (float) $k->luas_tertangani_ha,
+            'status' => $k->status_penanganan, 'warna' => Kejadian::STATUS[$k->status_penanganan] ?? '#9AA4A8',
+            'foto' => $this->fotoKejadian($k),
         ]);
 
         return response()->json([
@@ -74,13 +75,13 @@ class PetaController extends Controller
                         'id' => $l->id, 'tanggal' => $l->tanggal->translatedFormat('d M Y'), 'debit' => (float) $l->debit_intake_lps,
                         'tma' => (float) $l->tma_cm, 'kondisi' => $l->kondisi_saluran, 'tanam' => (float) $l->luas_tanam_ha,
                         'kering' => (float) $l->luas_kering_ha, 'puso' => (float) $l->luas_puso_ha, 'pelapor' => $l->user?->name,
-                        'foto' => $l->foto->take(3)->map->url->values(), 'url' => route('laporan.show', $l),
+                        'foto' => $l->foto->take(3)->map(fn ($f) => ['kecil' => $f->url_kecil, 'besar' => $f->url])->values(), 'url' => route('laporan.show', $l),
                     ] : null,
                     'petugas' => $s->petugas->map(fn ($p) => ['nama' => $p->name, 'jabatan' => $p->jabatan, 'wa' => $p->waLink()])->values(),
                 ];
             })->filter()->values();
 
-        $kejadian = Kejadian::with('kabupaten:id,nama')->whereNotNull('lat')
+        $kejadian = Kejadian::with('kabupaten:id,nama', 'foto')->whereNotNull('lat')
             ->when($subIds !== null, fn ($q) => $q->where(fn ($w) => $w->whereNull('sub_daerah_irigasi_id')->orWhereIn('sub_daerah_irigasi_id', $subIds)))
             ->get()->map(fn ($k) => [
                 'lat' => $k->lat, 'lng' => $k->lng, 'jenis' => $k->jenis_kegagalan, 'penyebab' => $k->penyebab,
@@ -88,6 +89,7 @@ class PetaController extends Controller
                 'luas_terdampak_ha' => (float) $k->luas_terdampak_ha, 'status' => $k->status_penanganan,
                 'warna' => Kejadian::STATUS[$k->status_penanganan] ?? '#9AA4A8',
                 'pelapor' => $k->pelapor_nama, 'wa' => wa_link($k->pelapor_hp), 'url' => route('kejadian.show', $k),
+                'luas_tertangani_ha' => (float) $k->luas_tertangani_ha, 'foto' => $this->fotoKejadian($k),
             ]);
 
         $bangunan = Bangunan::whereNotNull('lat')
@@ -102,6 +104,15 @@ class PetaController extends Controller
             'bangunan' => $bangunan,
             'legenda' => $this->legenda(),
         ]);
+    }
+
+    /** Maks. 6 foto per kejadian: urut sebelum → sesudah → lainnya. */
+    private function fotoKejadian(Kejadian $k): array
+    {
+        $urut = ['sebelum' => 0, 'sesudah' => 1];
+
+        return $k->foto->sortBy(fn ($f) => [$urut[$f->keterangan] ?? 2, $f->id])->take(6)
+            ->map(fn ($f) => ['kecil' => $f->url_kecil, 'besar' => $f->url, 'label' => $f->label])->values()->all();
     }
 
     private function tanggal(Request $request): Carbon

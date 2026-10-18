@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\DaerahIrigasi;
+use App\Models\Foto;
 use App\Models\Kabupaten;
 use App\Models\Kejadian;
 use App\Models\SubDaerahIrigasi;
@@ -12,11 +13,13 @@ use Illuminate\Validation\Rule;
 
 class KejadianController extends Controller
 {
+    public const MAKS_FOTO = 12;
+
     public function __construct(private FotoService $foto) {}
 
     public function index(Request $request)
     {
-        $kejadian = Kejadian::with(['kabupaten:id,nama,wilayah_satgas_id', 'kabupaten.wilayahSatgas:id,kode', 'daerahIrigasi:id,nama'])
+        $kejadian = Kejadian::with(['kabupaten:id,nama,wilayah_satgas_id', 'kabupaten.wilayahSatgas:id,kode', 'daerahIrigasi:id,nama'])->withCount('foto')
             ->when($request->filled('status'), fn ($q) => $q->where('status_penanganan', $request->input('status')))
             ->when($request->filled('kabupaten'), fn ($q) => $q->where('kabupaten_id', $request->integer('kabupaten')))
             ->when($request->filled('jenis'), fn ($q) => $q->where('jenis_kegagalan', $request->input('jenis')))
@@ -46,8 +49,8 @@ class KejadianController extends Controller
         $data['pelapor_nama'] ??= $request->user()->name;
         $data['pelapor_hp'] = normalisasi_hp($data['pelapor_hp'] ?? $request->user()->no_hp);
         $data['sumber_data'] ??= 'Aplikasi IRIS';
-        $kejadian = Kejadian::create($data);
-        $this->foto->simpan($kejadian, $request->file('foto', []), 'kejadian', $kejadian->lat, $kejadian->lng);
+        $kejadian = Kejadian::create(collect($data)->except(['foto', 'jenis_foto'])->all());
+        $this->foto->simpan($kejadian, $request->file('foto', []), 'kejadian', $kejadian->lat, $kejadian->lng, $request->input('jenis_foto', 'sebelum'));
 
         return redirect()->route('kejadian.show', $kejadian)->with('ok', 'Kejadian dilaporkan.');
     }
@@ -72,8 +75,9 @@ class KejadianController extends Controller
         $this->authorize('update', $kejadian);
         $data = $this->validasi($request);
         $data['pelapor_hp'] = normalisasi_hp($data['pelapor_hp'] ?? null);
-        $kejadian->update($data);
-        $this->foto->simpan($kejadian, $request->file('foto', []), 'kejadian', $kejadian->lat, $kejadian->lng);
+        $kejadian->update(collect($data)->except(['foto', 'jenis_foto'])->all());
+        $sisa = self::MAKS_FOTO - $kejadian->foto()->count();
+        $this->foto->simpan($kejadian, array_slice($request->file('foto', []), 0, max(0, $sisa)), 'kejadian', $kejadian->lat, $kejadian->lng, $request->input('jenis_foto', 'lainnya'));
 
         return redirect()->route('kejadian.show', $kejadian)->with('ok', 'Kejadian diperbarui.');
     }
@@ -89,6 +93,34 @@ class KejadianController extends Controller
         $kejadian->update($data);
 
         return back()->with('ok', 'Status penanganan diperbarui.');
+    }
+
+    /** Unggah foto dokumentasi dari halaman detail (tanpa membuka form ubah). */
+    public function tambahFoto(Request $request, Kejadian $kejadian)
+    {
+        $this->authorize('foto', $kejadian);
+        $sisa = self::MAKS_FOTO - $kejadian->foto()->count();
+        $request->validate([
+            'foto' => ['required', 'array', 'min:1', 'max:'.max(0, $sisa)],
+            'foto.*' => ['image', 'max:8192'],
+            'jenis_foto' => ['required', Rule::in(array_keys(Foto::LABEL))],
+        ], [
+            'foto.required' => 'Pilih minimal satu foto.',
+            'foto.max' => $sisa > 0 ? "Sisa kuota foto kejadian ini $sisa." : 'Kejadian ini sudah punya '.self::MAKS_FOTO.' foto. Hapus foto lama dulu.',
+            'foto.*.image' => 'File harus berupa gambar (JPG/PNG).',
+        ]);
+        $n = $this->foto->simpan($kejadian, $request->file('foto', []), 'kejadian', $kejadian->lat, $kejadian->lng, $request->jenis_foto);
+
+        return back()->with('ok', "$n foto ditambahkan.");
+    }
+
+    public function hapusFoto(Kejadian $kejadian, Foto $foto)
+    {
+        $this->authorize('foto', $kejadian);
+        abort_unless($foto->fotoable_type === $kejadian->getMorphClass() && $foto->fotoable_id === $kejadian->id, 404);
+        $foto->delete();
+
+        return back()->with('ok', 'Foto dihapus.');
     }
 
     public function destroy(Kejadian $kejadian)
@@ -121,8 +153,9 @@ class KejadianController extends Controller
             'pelapor_nama' => ['nullable', 'string', 'max:255'],
             'pelapor_hp' => ['nullable', 'string', 'max:20'],
             'catatan' => ['nullable', 'string', 'max:2000'],
-            'foto' => ['nullable', 'array', 'max:5'],
+            'foto' => ['nullable', 'array', 'max:'.self::MAKS_FOTO],
             'foto.*' => ['image', 'max:8192'],
+            'jenis_foto' => ['nullable', Rule::in(array_keys(Foto::LABEL))],
         ], [], ['kabupaten_id' => 'kabupaten', 'luas_terdampak_ha' => 'luas terdampak', 'jenis_kegagalan' => 'jenis kejadian']);
     }
 

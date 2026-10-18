@@ -38,11 +38,7 @@
         @if($laporan->foto->isNotEmpty())
             <section class="panel p-5">
                 <h2 class="mb-3 text-lg font-semibold">Foto lapangan</h2>
-                <div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                    @foreach($laporan->foto as $f)
-                        <a href="{{ $f->url }}" target="_blank" rel="noopener"><img src="{{ $f->url }}" alt="Foto {{ $s->nama }} {{ $laporan->tanggal->format('d/m/Y') }}" loading="lazy" class="aspect-[4/3] w-full rounded object-cover"></a>
-                    @endforeach
-                </div>
+<x-galeri-foto :foto="$laporan->foto"/>
             </section>
         @endif
 

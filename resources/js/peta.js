@@ -49,7 +49,7 @@ function popupSub(s) {
     const petugas = (s.petugas || []).slice(0, 4).map((p) => `<div style="display:flex;justify-content:space-between;gap:8px;align-items:center;margin-top:3px">
         <span>${esc(p.nama)} <span style="color:#7C898E">${esc(p.jabatan ?? '')}</span></span>
         ${p.wa ? `<a href="${p.wa}" target="_blank" rel="noopener" style="background:#1f8f4e;color:#fff;border-radius:4px;padding:1px 6px;font-weight:600">WA</a>` : ''}</div>`).join('');
-    const foto = l && l.foto.length ? `<div style="display:flex;gap:4px;margin-top:6px">${l.foto.map((f) => `<a href="${f}" target="_blank"><img src="${f}" style="width:64px;height:48px;object-fit:cover;border-radius:4px"></a>`).join('')}</div>` : '';
+    const foto = l && l.foto.length ? galeriPopup(l.foto.map((f) => ({ ...f, label: l.tanggal })), 230) : '';
     return `<div style="min-width:230px;font-size:12px">
         <div style="font-family:'Barlow Semi Condensed';font-size:17px;font-weight:600;line-height:1.1">${esc(s.nama)}</div>
         <div style="color:#4A585E;margin:2px 0 6px">D.I. ${esc(s.di)} · ${fmt(s.luas_ha)} Ha${s.titik_pasti ? '' : ' · <i>titik belum diatur</i>'}</div>
@@ -66,13 +66,28 @@ function popupSub(s) {
     </div>`;
 }
 
+/** Galeri foto ringkas untuk popup: foto pertama besar + thumbnail, klik membuka layar penuh. */
+function galeriPopup(foto, lebar = 240) {
+    if (!foto || !foto.length) return '';
+    const data = esc(JSON.stringify(foto.map((f) => ({ besar: f.besar, label: f.label || '' }))));
+    const [utama, ...lain] = foto;
+    const label = utama.label ? `<span style="position:absolute;left:6px;bottom:6px;background:rgba(30,42,47,.75);color:#fff;font-size:10px;font-weight:600;padding:1px 6px;border-radius:999px">${esc(utama.label)}</span>` : '';
+    return `<div style="margin-top:8px">
+        <a href="${utama.besar}" data-galeri="${data}" data-indeks="0" style="position:relative;display:block;width:${lebar}px;height:${Math.round(lebar * 0.62)}px;border-radius:6px;overflow:hidden;background:#E7ECE8">
+            <img src="${utama.kecil}" alt="Foto kejadian" loading="lazy" width="${lebar}" height="${Math.round(lebar * 0.62)}" style="width:100%;height:100%;object-fit:cover">${label}
+        </a>
+        ${lain.length ? `<div style="display:flex;gap:4px;margin-top:4px">${lain.slice(0, 4).map((f, n) => `<a href="${f.besar}" data-galeri="${data}" data-indeks="${n + 1}" style="position:relative;display:block;width:${Math.floor((lebar - 12) / 4)}px;height:40px;border-radius:4px;overflow:hidden"><img src="${f.kecil}" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover">${n === 3 && lain.length > 4 ? `<span style="position:absolute;inset:0;background:rgba(30,42,47,.6);color:#fff;font-weight:700;display:flex;align-items:center;justify-content:center">+${lain.length - 4}</span>` : ''}</a>`).join('')}</div>` : ''}
+    </div>`;
+}
+
 function popupKejadian(k, internal) {
-    return `<div style="min-width:210px;font-size:12px">
+    return `<div style="min-width:220px;max-width:240px;font-size:12px">
         <div style="font-weight:700;font-size:13px">${esc(k.jenis)}</div>
         <div style="color:#4A585E;margin:2px 0 6px">${esc([k.desa, k.kecamatan, k.kabupaten].filter(Boolean).join(', '))}</div>
         ${chip(k.status, k.warna)}
-        <div style="margin-top:6px">Luas terdampak: <b>${fmt(k.luas_terdampak_ha, 2)} Ha</b></div>
+        <div style="margin-top:6px">Luas terdampak: <b>${fmt(k.luas_terdampak_ha, 2)} Ha</b>${k.luas_tertangani_ha ? ` · tertangani <b>${fmt(k.luas_tertangani_ha, 2)} Ha</b>` : ''}</div>
         ${k.penyebab ? `<div>Penyebab: ${esc(k.penyebab)}</div>` : ''}
+        ${k.foto && k.foto.length ? galeriPopup(k.foto) : '<div style="margin-top:6px;color:#7C898E">Belum ada foto dokumentasi.</div>'}
         ${internal && k.pelapor ? `<div style="margin-top:4px">Pelapor: ${esc(k.pelapor)} ${k.wa ? `<a href="${k.wa}" target="_blank" rel="noopener" style="background:#1f8f4e;color:#fff;border-radius:4px;padding:1px 6px;font-weight:600">WA</a>` : ''}</div>` : ''}
         ${internal ? `<a href="${k.url}" style="display:inline-block;margin-top:6px;font-weight:600;color:#0F5E6E">Detail kejadian</a>` : ''}
     </div>`;
@@ -245,7 +260,7 @@ export function createMap(opsi) {
                 const lyr = L.layerGroup();
                 this.data.kejadian.forEach((k) => {
                     if (this.kabupaten && k.kabupaten !== this.kabupaten) return;
-                    L.marker([k.lat, k.lng], { icon: ikonKejadian(k.warna) }).bindPopup(popupKejadian(k, this.internal)).addTo(lyr);
+                    L.marker([k.lat, k.lng], { icon: ikonKejadian(k.warna) }).bindPopup(popupKejadian(k, this.internal), { maxWidth: 260 }).addTo(lyr);
                 });
                 layers.kejadian = lyr.addTo(map);
             }

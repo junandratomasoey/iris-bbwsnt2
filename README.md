@@ -76,11 +76,22 @@ php artisan tinker --execute="App\Models\LaporanHarian::where('kendala','like','
    ```bash
    php artisan key:generate   # hanya sekali, bila APP_KEY kosong
    php artisan migrate --force --seed
-   php artisan config:cache && php artisan route:cache && php artisan view:cache
+   php artisan config:cache && php artisan view:cache
    ```
 5. **Foto lapangan** disimpan di `public/uploads/` (tidak perlu `storage:link`). Pastikan folder bisa ditulis web server. Folder ini ada di `.gitignore`; backup terpisah.
 6. **Aset tampilan** (`public/build/`) ikut di-commit, jadi server tidak butuh Node.js. Setelah mengubah tampilan, jalankan `npm run build` di laptop lalu commit.
 7. **HTTPS wajib** agar GPS di HP dan PWA (service worker) berfungsi.
+
+### Update aplikasi
+
+```bash
+git pull
+php artisan migrate --force
+php artisan optimize:clear
+php artisan config:cache && php artisan view:cache
+```
+
+**Jangan jalankan `php artisan route:cache` atau `php artisan optimize`** bila aplikasi dipasang di subfolder (mis. `bbwsnt2.com/iris`). Route cache Laravel membuang garis miring akhir sebelum mencocokkan route, sehingga halaman utama `/iris/` membalas *405 Method Not Allowed*. Bila terlanjur, jalankan `php artisan route:clear`.
 
 ## Data sumber
 

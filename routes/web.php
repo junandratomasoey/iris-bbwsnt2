@@ -41,6 +41,8 @@ Route::middleware(['auth', 'siap'])->group(function () {
     Route::resource('laporan', LaporanHarianController::class)->parameters(['laporan' => 'laporan']);
 
     Route::patch('/kejadian/{kejadian}/penanganan', [KejadianController::class, 'penanganan'])->name('kejadian.penanganan');
+    Route::post('/kejadian/{kejadian}/foto', [KejadianController::class, 'tambahFoto'])->name('kejadian.foto.store');
+    Route::delete('/kejadian/{kejadian}/foto/{foto}', [KejadianController::class, 'hapusFoto'])->name('kejadian.foto.destroy');
     Route::resource('kejadian', KejadianController::class)->parameters(['kejadian' => 'kejadian']);
 
     Route::get('/petugas', [PetugasController::class, 'index'])->name('petugas.index');

@@ -40,9 +40,24 @@
         </div>
         @error('lat')<p class="text-xs font-medium text-status-kritis">{{ $message }}</p>@enderror
     </fieldset>
-    <fieldset class="panel p-5">
-        <legend class="float-left font-gauge text-lg font-semibold">Foto (maks. 5)</legend>
-        <input type="file" name="foto[]" accept="image/*" multiple class="clear-left mt-2 block text-sm">
+    <fieldset class="panel space-y-3 p-5">
+        <legend class="float-left font-gauge text-lg font-semibold">Foto dokumentasi</legend>
+        @if(! $baru && $kejadian->foto->isNotEmpty())
+            <div class="clear-left">
+                <p class="mb-2 text-sm text-basalt-soft">Foto yang sudah ada ({{ $kejadian->foto->count() }}). Hapus dari halaman detail kejadian.</p>
+                <x-galeri-foto :foto="$kejadian->foto"/>
+            </div>
+        @endif
+        @php $sisaFoto = \App\Http\Controllers\KejadianController::MAKS_FOTO - ($baru ? 0 : $kejadian->foto->count()); @endphp
+        @if($sisaFoto > 0)
+            <div class="clear-left flex flex-wrap gap-2" role="radiogroup" aria-label="Jenis foto baru">
+                @foreach(\App\Models\Foto::LABEL as $k => $l)
+                    <label class="cursor-pointer"><input type="radio" name="jenis_foto" value="{{ $k }}" @checked(old('jenis_foto', $baru ? 'sebelum' : 'lainnya') === $k) class="peer sr-only">
+                        <span class="block rounded-md border border-savana-line px-3 py-1.5 text-sm peer-checked:border-saluran-600 peer-checked:bg-saluran-600 peer-checked:text-white">{{ $l }}</span></label>
+                @endforeach
+            </div>
+            <x-unggah-foto :maks="min(5, $sisaFoto)" class="clear-left"/>
+        @endif
     </fieldset>
     <div class="flex gap-2"><button class="btn-primary px-8">{{ $baru ? 'Kirim laporan kejadian' : 'Simpan perubahan' }}</button><a href="{{ $baru ? route('kejadian.index') : route('kejadian.show', $kejadian) }}" class="btn-ghost">Batal</a></div>
 </form>

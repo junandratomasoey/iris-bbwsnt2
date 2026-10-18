@@ -2,26 +2,9 @@
  * Form laporan harian petugas: draf tersimpan di HP, GPS otomatis,
  * foto dikompres di browser sebelum dikirim (hemat kuota & sinyal).
  */
-const MAKS_SISI = 1600;
-const KUALITAS = 0.72;
-const MAKS_FOTO = 5;
+import { kompres } from './foto';
 
-async function kompres(file) {
-    if (!file.type.startsWith('image/')) return file;
-    try {
-        const bmp = await createImageBitmap(file, { imageOrientation: 'from-image' });
-        const skala = Math.min(1, MAKS_SISI / Math.max(bmp.width, bmp.height));
-        const c = document.createElement('canvas');
-        c.width = Math.round(bmp.width * skala);
-        c.height = Math.round(bmp.height * skala);
-        c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
-        const blob = await new Promise((r) => c.toBlob(r, 'image/jpeg', KUALITAS));
-        if (!blob || blob.size >= file.size) return file;
-        return new File([blob], file.name.replace(/\.\w+$/, '') + '.jpg', { type: 'image/jpeg' });
-    } catch (e) {
-        return file;
-    }
-}
+const MAKS_FOTO = 5;
 
 export function laporanForm(opsi) {
     return {

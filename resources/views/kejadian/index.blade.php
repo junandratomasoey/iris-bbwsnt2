@@ -34,7 +34,7 @@
                         <td><a href="{{ route('kejadian.show', $k) }}" class="font-semibold text-saluran-700 hover:underline">{{ $k->desa ?? $k->kecamatan ?? $k->kabupaten?->nama }}</a>
                             <div class="text-xs text-basalt-soft">{{ collect([$k->kecamatan, $k->kabupaten?->nama])->filter()->implode(', ') }}@if($k->daerahIrigasi) · D.I. {{ $k->daerahIrigasi->nama }}@endif</div></td>
                         <td class="whitespace-nowrap">{{ $k->kabupaten?->wilayahSatgas ? 'Wilayah '.$k->kabupaten->wilayahSatgas->kode : '–' }}</td>
-                        <td>{{ $k->jenis_kegagalan }}<div class="text-xs text-basalt-soft">{{ $k->penyebab }}</div></td>
+                        <td>{{ $k->jenis_kegagalan }}<div class="text-xs text-basalt-soft">{{ $k->penyebab }}</div>@if($k->foto_count)<div class="mt-0.5 flex items-center gap-1 text-xs text-saluran-600"><x-ikon n="kamera" class="h-3.5 w-3.5"/> {{ $k->foto_count }} foto</div>@endif</td>
                         <td class="text-right tabular-nums">{{ angka($k->luas_terdampak_ha, 2) }}</td>
                         <td class="text-right tabular-nums">{{ angka($k->luas_tertangani_ha, 2) }}</td>
                         <td><x-kejadian-status :s="$k->status_penanganan"/></td>

@@ -4,7 +4,8 @@
     @can('delete', $kejadian)<form method="POST" action="{{ route('kejadian.destroy', $kejadian) }}" onsubmit="return confirm('Hapus kejadian ini?')">@csrf @method('DELETE')<button class="btn-ghost text-status-kritis"><x-ikon n="hapus" class="h-4 w-4"/> Hapus</button></form>@endcan
 </x-judul>
 <div class="grid gap-5 lg:grid-cols-3">
-    <section class="panel p-5 lg:col-span-2">
+    <div class="space-y-5 lg:col-span-2">
+    <section class="panel p-5">
         <div class="flex flex-wrap gap-2"><x-kejadian-status :s="$kejadian->status_penanganan"/><span class="chip-kosong">{{ $kejadian->status_kegagalan }}</span>@if($kejadian->kabupaten?->wilayahSatgas)<span class="chip-kosong">Satgas Wilayah {{ $kejadian->kabupaten->wilayahSatgas->kode }}</span>@endif</div>
         @php $persen = $kejadian->luas_terdampak_ha > 0 ? min(100, $kejadian->luas_tertangani_ha / $kejadian->luas_terdampak_ha * 100) : 0; @endphp
         <div class="mt-4">
@@ -20,10 +21,41 @@
             <div><dt class="text-basalt-soft">Sumber data</dt><dd>{{ $kejadian->sumber_data ?? '–' }}</dd></div>
             @if($kejadian->catatan)<div class="sm:col-span-2"><dt class="text-basalt-soft">Catatan</dt><dd class="whitespace-pre-line">{{ $kejadian->catatan }}</dd></div>@endif
         </dl>
-        @if($kejadian->foto->isNotEmpty())
-            <div class="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-3">@foreach($kejadian->foto as $f)<a href="{{ $f->url }}" target="_blank"><img src="{{ $f->url }}" alt="Foto kejadian" class="aspect-[4/3] w-full rounded object-cover" loading="lazy"></a>@endforeach</div>
-        @endif
     </section>
+
+    <section class="panel p-5" aria-labelledby="judul-foto">
+        <div class="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 id="judul-foto" class="text-lg font-semibold">Foto dokumentasi <span class="text-sm font-normal text-basalt-mute">{{ $kejadian->foto->count() }}/{{ \App\Http\Controllers\KejadianController::MAKS_FOTO }}</span></h2>
+            <p class="text-xs text-basalt-mute">Foto tampil juga di peta saat titik kejadian diklik.</p>
+        </div>
+        @if($kejadian->foto->isNotEmpty())
+            @can('foto', $kejadian)
+                <x-galeri-foto :foto="$kejadian->foto" :kelompok="true" class="mt-3" :hapus-route="fn ($f) => route('kejadian.foto.destroy', [$kejadian, $f])"/>
+            @else
+                <x-galeri-foto :foto="$kejadian->foto" :kelompok="true" class="mt-3"/>
+            @endcan
+        @else
+            <p class="mt-2 text-sm text-basalt-soft">Belum ada foto.</p>
+        @endif
+
+        @can('foto', $kejadian)
+            @if($kejadian->foto->count() < \App\Http\Controllers\KejadianController::MAKS_FOTO)
+                <form method="POST" action="{{ route('kejadian.foto.store', $kejadian) }}" enctype="multipart/form-data" class="mt-5 space-y-3 border-t border-savana-line pt-4" x-data="{ kirim: false }" @submit="kirim = true">
+                    @csrf
+                    <p class="text-sm font-semibold">Tambah foto</p>
+                    <div class="flex flex-wrap gap-2" role="radiogroup" aria-label="Jenis foto">
+                        @foreach(\App\Models\Foto::LABEL as $k => $l)
+                            <label class="cursor-pointer"><input type="radio" name="jenis_foto" value="{{ $k }}" @checked(old('jenis_foto', $kejadian->status_penanganan === 'Selesai Ditangani' ? 'sesudah' : 'sebelum') === $k) class="peer sr-only">
+                                <span class="block rounded-md border border-savana-line px-3 py-1.5 text-sm peer-checked:border-saluran-600 peer-checked:bg-saluran-600 peer-checked:text-white">{{ $l }}</span></label>
+                        @endforeach
+                    </div>
+                    <x-unggah-foto :maks="min(5, \App\Http\Controllers\KejadianController::MAKS_FOTO - $kejadian->foto->count())"/>
+                    <button class="btn-primary" :disabled="kirim" x-text="kirim ? 'Mengunggah…' : 'Unggah foto'"></button>
+                </form>
+            @endif
+        @endcan
+    </section>
+    </div>
     <div class="space-y-5">
         <section class="panel p-5 text-sm">
             <h2 class="mb-2 text-lg font-semibold">Pelapor</h2>

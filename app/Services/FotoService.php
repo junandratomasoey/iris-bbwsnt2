@@ -15,20 +15,29 @@ class FotoService
 
     public const KUALITAS = 72;
 
+    public const SISI_KECIL = 480;
+
     /** @param UploadedFile[] $files */
-    public function simpan(Model $pemilik, array $files, string $folder, ?float $lat = null, ?float $lng = null): void
+    public function simpan(Model $pemilik, array $files, string $folder, ?float $lat = null, ?float $lng = null, ?string $keterangan = null): int
     {
+        $n = 0;
         foreach ($files as $file) {
             if (! $file instanceof UploadedFile || ! $file->isValid()) {
                 continue;
             }
             $path = $folder.'/'.now()->format('Y/m').'/'.Str::uuid().'.jpg';
             Storage::disk('uploads')->put($path, $this->kompres($file));
-            $pemilik->foto()->create(['path' => $path, 'lat' => $lat, 'lng' => $lng]);
+            if ($kecil = $this->kompres($file, self::SISI_KECIL, 65)) {
+                Storage::disk('uploads')->put(Foto::pathKecil($path), $kecil);
+            }
+            $pemilik->foto()->create(['path' => $path, 'lat' => $lat, 'lng' => $lng, 'keterangan' => $keterangan]);
+            $n++;
         }
+
+        return $n;
     }
 
-    private function kompres(UploadedFile $file): string
+    private function kompres(UploadedFile $file, int $maksSisi = self::MAKS_SISI, int $kualitas = self::KUALITAS): string
     {
         $raw = file_get_contents($file->getRealPath());
         if (! function_exists('imagecreatefromstring') || ! ($img = @imagecreatefromstring($raw))) {
@@ -36,7 +45,7 @@ class FotoService
         }
         $img = $this->putarSesuaiExif($img, $file);
         [$w, $h] = [imagesx($img), imagesy($img)];
-        $skala = min(1, self::MAKS_SISI / max($w, $h));
+        $skala = min(1, $maksSisi / max($w, $h));
         if ($skala < 1) {
             $baru = imagecreatetruecolor((int) round($w * $skala), (int) round($h * $skala));
             imagecopyresampled($baru, $img, 0, 0, 0, 0, imagesx($baru), imagesy($baru), $w, $h);
@@ -44,7 +53,7 @@ class FotoService
             $img = $baru;
         }
         ob_start();
-        imagejpeg($img, null, self::KUALITAS);
+        imagejpeg($img, null, $kualitas);
         imagedestroy($img);
 
         return ob_get_clean();
