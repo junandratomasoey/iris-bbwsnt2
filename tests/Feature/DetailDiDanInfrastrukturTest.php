@@ -153,4 +153,31 @@ class DetailDiDanInfrastrukturTest extends TestCase
 
         $this->getJson(route('api.publik.di', $oesao))->assertOk()->assertJsonPath('bangunan.0.teknis.0.label', fn ($v) => is_string($v));
     }
+
+    public function test_foto_profil_di_maksimal_3_dan_tampil_di_peta_publik(): void
+    {
+        $gambar = fn ($n) => array_map(fn ($i) => UploadedFile::fake()->image("p$i.jpg", 1200, 800), range(1, $n));
+
+        $this->actingAs($this->petugas)->post(route('master.daerah-irigasi.foto.store', $this->di), ['foto' => $gambar(1)])->assertForbidden();
+
+        $this->actingAs($this->admin)->post(route('master.daerah-irigasi.foto.store', $this->di), [
+            'foto' => $gambar(2), 'judul' => 'Walkthrough 2025', 'diambil_pada' => '2025-08-12',
+        ])->assertSessionHasNoErrors()->assertSessionHas('ok', '2 foto profil ditambahkan.');
+        $this->actingAs($this->admin)->post(route('master.daerah-irigasi.foto.store', $this->di), ['foto' => $gambar(2)])
+            ->assertSessionHasErrors('foto');                                     // hanya sisa 1 tempat
+
+        [$a, $b] = $this->di->fotoProfil()->get()->all();
+        $this->actingAs($this->admin)->patch(route('master.daerah-irigasi.foto.update', [$this->di, $b]), ['judul' => 'ePAKSI saluran induk', 'utama' => 1])
+            ->assertSessionHasNoErrors();
+
+        $r = $this->getJson(route('api.publik.di', $this->di))->assertOk();
+        $r->assertJsonCount(2, 'profil')
+            ->assertJsonPath('profil.0.judul', 'ePAKSI saluran induk')              // jadi foto utama
+            ->assertJsonPath('profil.1.tanggal', '12 Agt 2025');
+
+        $path = $a->path;
+        $this->actingAs($this->admin)->delete(route('master.daerah-irigasi.foto.destroy', [$this->di, $a]))->assertRedirect();
+        Storage::disk('uploads')->assertMissing($path);
+        $this->actingAs($this->admin)->get(route('master.daerah-irigasi.show', $this->di))->assertOk()->assertSee('Foto profil D.I.')->assertSee('1/3');
+    }
 }

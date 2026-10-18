@@ -4,9 +4,11 @@ namespace App\Http\Controllers\Master;
 
 use App\Http\Controllers\Controller;
 use App\Models\DaerahIrigasi;
+use App\Models\Foto;
 use App\Models\Kabupaten;
 use App\Models\LaporanHarian;
 use App\Models\P3a;
+use App\Services\FotoService;
 use App\Services\KondisiService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -16,7 +18,7 @@ class DaerahIrigasiController extends Controller
     public function index(Request $request, KondisiService $kondisi)
     {
         $ringkasan = $kondisi->ringkasanDi(today());
-        $di = DaerahIrigasi::with('kabupaten.wilayahSatgas')->withCount(['subDaerahIrigasi', 'petugas', 'bangunan'])
+        $di = DaerahIrigasi::with('kabupaten.wilayahSatgas')->withCount(['subDaerahIrigasi', 'petugas', 'bangunan', 'fotoProfil'])
             ->when($request->filled('q'), fn ($q) => $q->where('nama', 'like', '%'.$request->q.'%'))
             ->orderBy('kode')->get();
 
@@ -25,7 +27,7 @@ class DaerahIrigasiController extends Controller
 
     public function show(DaerahIrigasi $di, KondisiService $kondisi)
     {
-        $di->load(['kabupaten.wilayahSatgas', 'subDaerahIrigasi.petugas:id,name,no_hp,jabatan', 'bangunan', 'jadwalTanam',
+        $di->load(['fotoProfil', 'kabupaten.wilayahSatgas', 'subDaerahIrigasi.petugas:id,name,no_hp,jabatan', 'bangunan', 'jadwalTanam',
             'petugas' => fn ($q) => $q->orderByRaw("CASE jabatan WHEN 'Manager' THEN 0 WHEN 'POB' THEN 1 ELSE 2 END")->orderBy('name')]);
         $ring = $kondisi->ringkasanDi(today())->get($di->id);
         $laporanTerkini = $kondisi->laporanTerkini(today(), $di->subDaerahIrigasi->pluck('id')->all());
@@ -75,6 +77,65 @@ class DaerahIrigasiController extends Controller
         $di->delete();
 
         return redirect()->route('master.daerah-irigasi.index')->with('ok', 'D.I. dihapus.');
+    }
+
+    // ---------- foto profil (kondisi awal) ----------
+
+    public function fotoProfilStore(Request $request, DaerahIrigasi $di, FotoService $foto)
+    {
+        $this->authorize('kelola-master');
+        $sisa = DaerahIrigasi::MAKS_FOTO_PROFIL - $di->fotoProfil()->count();
+        $data = $request->validate([
+            'foto' => ['required', 'array', 'min:1', 'max:'.max(0, $sisa)],
+            'foto.*' => ['image', 'max:8192'],
+            'judul' => ['nullable', 'string', 'max:150'],
+            'diambil_pada' => ['nullable', 'date', 'before_or_equal:today'],
+        ], [
+            'foto.required' => 'Pilih minimal satu foto.',
+            'foto.max' => $sisa > 0 ? "Sisa tempat foto profil $sisa." : 'Sudah ada '.DaerahIrigasi::MAKS_FOTO_PROFIL.' foto profil. Hapus salah satu dulu.',
+            'foto.*.image' => 'File harus berupa gambar (JPG/PNG).',
+        ]);
+        $urutan = (int) $di->fotoProfil()->max('urutan') + 1;
+        $n = 0;
+        foreach ($request->file('foto', []) as $f) {
+            $n += $foto->simpan($di, [$f], 'profil-di', null, null, 'profil', [
+                'judul' => $data['judul'] ?? null, 'diambil_pada' => $data['diambil_pada'] ?? null, 'urutan' => $urutan++,
+            ]);
+        }
+
+        return back()->with('ok', "$n foto profil ditambahkan.");
+    }
+
+    public function fotoProfilUpdate(Request $request, DaerahIrigasi $di, Foto $foto)
+    {
+        $this->authorize('kelola-master');
+        $this->milikDi($di, $foto);
+        $data = $request->validate([
+            'judul' => ['nullable', 'string', 'max:150'],
+            'diambil_pada' => ['nullable', 'date', 'before_or_equal:today'],
+        ]);
+        $foto->update($data);
+        if ($request->boolean('utama')) { // jadikan foto pertama, sisanya bergeser
+            $di->fotoProfil()->get()->reject(fn ($f) => $f->id === $foto->id)->values()
+                ->each(fn ($f, $i) => $f->update(['urutan' => $i + 1]));
+            $foto->update(['urutan' => 0]);
+        }
+
+        return back()->with('ok', 'Foto profil diperbarui.');
+    }
+
+    public function fotoProfilDestroy(DaerahIrigasi $di, Foto $foto)
+    {
+        $this->authorize('kelola-master');
+        $this->milikDi($di, $foto);
+        $foto->delete();
+
+        return back()->with('ok', 'Foto profil dihapus.');
+    }
+
+    private function milikDi(DaerahIrigasi $di, Foto $foto): void
+    {
+        abort_unless($foto->fotoable_type === $di->getMorphClass() && $foto->fotoable_id === $di->id && $foto->keterangan === 'profil', 404);
     }
 
     private function validasi(Request $request, ?DaerahIrigasi $di = null): array

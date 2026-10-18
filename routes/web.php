@@ -56,6 +56,9 @@ Route::middleware(['auth', 'siap'])->group(function () {
 
     // master data: semua user internal boleh melihat, hanya pengelola yang mengubah (dicek di controller)
     Route::prefix('master')->name('master.')->group(function () {
+        Route::post('daerah-irigasi/{di}/foto-profil', [DaerahIrigasiController::class, 'fotoProfilStore'])->name('daerah-irigasi.foto.store');
+        Route::patch('daerah-irigasi/{di}/foto-profil/{foto}', [DaerahIrigasiController::class, 'fotoProfilUpdate'])->name('daerah-irigasi.foto.update');
+        Route::delete('daerah-irigasi/{di}/foto-profil/{foto}', [DaerahIrigasiController::class, 'fotoProfilDestroy'])->name('daerah-irigasi.foto.destroy');
         Route::resource('daerah-irigasi', DaerahIrigasiController::class)->parameters(['daerah-irigasi' => 'di']);
         Route::resource('daerah-irigasi.sub', SubDaerahIrigasiController::class)
             ->parameters(['daerah-irigasi' => 'di', 'sub' => 'sub'])->except(['index', 'show'])->shallow();

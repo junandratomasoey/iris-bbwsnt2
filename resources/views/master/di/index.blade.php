@@ -4,7 +4,7 @@
 </x-judul>
 <div class="panel overflow-x-auto">
     <table class="table-base">
-        <thead><tr><th>Kode</th><th>D.I.</th><th>Kabupaten</th><th>Satgas</th><th class="text-right">Luas Permen (Ha)</th><th class="text-right">Fungsional SHP (Ha)</th><th class="text-right">Sub-D.I.</th><th class="text-right">Petugas</th><th>Status hari ini</th></tr></thead>
+        <thead><tr><th>Kode</th><th>D.I.</th><th>Kabupaten</th><th>Satgas</th><th class="text-right">Luas Permen (Ha)</th><th class="text-right">Fungsional SHP (Ha)</th><th class="text-right">Sub-D.I.</th><th class="text-right">Petugas</th><th class="text-center">Foto profil</th><th>Status hari ini</th></tr></thead>
         <tbody>
         @foreach($di as $d)
             @php $r = $ringkasan->get($d->id); @endphp
@@ -17,6 +17,7 @@
                 <td class="text-right tabular-nums">{{ angka($d->luas_fungsional_ha) }}</td>
                 <td class="text-right">{{ $d->sub_daerah_irigasi_count }}</td>
                 <td class="text-right">{{ $d->petugas_count }}</td>
+                <td class="text-center tabular-nums">@if($d->foto_profil_count)<span class="text-basalt-soft">{{ $d->foto_profil_count }}/{{ \App\Models\DaerahIrigasi::MAKS_FOTO_PROFIL }}</span>@else<a href="{{ route('master.daerah-irigasi.show', $d) }}#judul-profil" class="text-xs font-semibold text-status-siaga hover:underline">Belum ada</a>@endif</td>
                 <td><x-status :s="$r['status'] ?? 'kosong'"/></td>
             </tr>
         @endforeach

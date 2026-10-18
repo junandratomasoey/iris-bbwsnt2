@@ -13,7 +13,9 @@ class Foto extends Model
     /** Label foto kejadian (kolom keterangan). */
     public const LABEL = ['sebelum' => 'Sebelum penanganan', 'sesudah' => 'Sesudah penanganan', 'lainnya' => 'Dokumentasi lain'];
 
-    protected $fillable = ['path', 'keterangan', 'lat', 'lng'];
+    protected $fillable = ['path', 'keterangan', 'judul', 'diambil_pada', 'urutan', 'lat', 'lng'];
+
+    protected $casts = ['diambil_pada' => \App\Casts\Tanggal::class];
 
     protected static function booted(): void
     {

@@ -14,6 +14,21 @@
         <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 font-semibold" :style="`background:${diPilih.warna}22`"><span class="h-2 w-2 rounded-full" :style="`background:${diPilih.warna}`"></span><span x-text="diPilih.status_label"></span></span>
         <span class="text-basalt-soft" x-text="modeRekap ? `status ${warna} · ${data?.periode?.label}` : (diPilih.mt ? diPilih.mt + ' berjalan' : 'MT belum dijadwalkan')"></span>
     </div>
+    {{-- foto profil / kondisi awal D.I. (walkthrough, ePAKSI): 1 foto utama + maks. 2 kecil --}}
+    <template x-if="detail && detail.profil && detail.profil.length">
+        <figure class="mt-3">
+            <div class="grid h-40 gap-1 overflow-hidden rounded-md" :class="detail.profil.length > 1 ? 'grid-cols-3 grid-rows-2' : 'grid-cols-1'">
+                <template x-for="(f, i) in detail.profil" :key="f.besar">
+                    <a :href="f.besar" :data-galeri="galeri(detail.profil)" :data-indeks="i"
+                       class="relative block overflow-hidden bg-savana-deep"
+                       :class="i === 0 ? (detail.profil.length > 1 ? 'col-span-2 row-span-2' : '') : (detail.profil.length === 2 ? 'row-span-2' : '')">
+                        <img :src="i === 0 ? f.besar : f.kecil" :alt="f.label" class="h-full w-full object-cover transition hover:opacity-90" :loading="i === 0 ? 'eager' : 'lazy'">
+                    </a>
+                </template>
+            </div>
+            <figcaption class="mt-1 text-[11px] text-basalt-mute" x-text="'Kondisi awal · ' + (detail.profil[0].judul || 'foto profil D.I.') + (detail.profil[0].tanggal ? ' · ' + detail.profil[0].tanggal : '')"></figcaption>
+        </figure>
+    </template>
     <dl class="mt-3 grid grid-cols-2 gap-px overflow-hidden rounded-md border border-savana-line bg-savana-line text-sm">
         <div class="bg-white px-3 py-2"><dt class="text-[11px] text-basalt-soft">Luas fungsional</dt><dd class="font-gauge text-xl font-semibold leading-tight"><span x-text="fmt(diPilih.luas_ha)"></span> <span class="text-xs font-normal">Ha</span></dd></div>
         <div class="bg-white px-3 py-2" x-show="!modeRekap"><dt class="text-[11px] text-basalt-soft">Sub-D.I. melapor (3 hari)</dt><dd class="font-gauge text-xl font-semibold leading-tight"><span x-text="diPilih.sub_lapor"></span><span class="text-sm font-normal text-basalt-soft" x-text="' / ' + diPilih.jumlah_sub"></span></dd></div>

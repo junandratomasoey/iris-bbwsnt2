@@ -18,7 +18,7 @@ class FotoService
     public const SISI_KECIL = 480;
 
     /** @param UploadedFile[] $files */
-    public function simpan(Model $pemilik, array $files, string $folder, ?float $lat = null, ?float $lng = null, ?string $keterangan = null): int
+    public function simpan(Model $pemilik, array $files, string $folder, ?float $lat = null, ?float $lng = null, ?string $keterangan = null, array $atribut = []): int
     {
         $n = 0;
         foreach ($files as $file) {
@@ -30,7 +30,7 @@ class FotoService
             if ($kecil = $this->kompres($file, self::SISI_KECIL, 65)) {
                 Storage::disk('uploads')->put(Foto::pathKecil($path), $kecil);
             }
-            $pemilik->foto()->create(['path' => $path, 'lat' => $lat, 'lng' => $lng, 'keterangan' => $keterangan]);
+            $pemilik->foto()->create(['path' => $path, 'lat' => $lat, 'lng' => $lng, 'keterangan' => $keterangan] + $atribut);
             $n++;
         }
 

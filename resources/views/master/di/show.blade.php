@@ -6,6 +6,60 @@
     @if($kelola)<a href="{{ route('master.daerah-irigasi.edit', $di) }}" class="btn-ghost"><x-ikon n="edit" class="h-4 w-4"/> Ubah</a>@endif
 </x-judul>
 
+@php $maksProfil = \App\Models\DaerahIrigasi::MAKS_FOTO_PROFIL; $sisaProfil = $maksProfil - $di->fotoProfil->count(); @endphp
+<section class="panel mb-5 p-5" aria-labelledby="judul-profil">
+    <div class="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 id="judul-profil" class="text-lg font-semibold">Foto profil D.I. <span class="text-sm font-normal text-basalt-mute">{{ $di->fotoProfil->count() }}/{{ $maksProfil }}</span></h2>
+        <p class="text-xs text-basalt-mute">Kondisi awal (walkthrough / ePAKSI). Tampil di peta publik saat D.I. diklik; foto pertama jadi foto utama.</p>
+    </div>
+    @if($di->fotoProfil->isEmpty())
+        <p class="mt-2 text-sm text-basalt-soft">Belum ada foto profil.{{ $kelola ? ' Tambahkan minimal satu agar D.I. ini punya gambaran kondisi awal di peta.' : '' }}</p>
+    @else
+        @php $galeri = $di->fotoProfil->map(fn ($f) => ['besar' => $f->url, 'label' => trim(($f->judul ?? '').($f->diambil_pada ? ' · '.$f->diambil_pada->translatedFormat('d M Y') : ''), ' ·')])->values(); @endphp
+        <div class="mt-3 grid gap-4 sm:grid-cols-3">
+            @foreach($di->fotoProfil as $i => $f)
+                <div class="rounded-md border border-savana-line p-2">
+                    <a href="{{ $f->url }}" data-galeri='@json($galeri)' data-indeks="{{ $i }}" class="relative block">
+                        <img src="{{ $f->url_kecil }}" alt="{{ $f->judul ?? 'Foto profil D.I. '.$di->nama }}" loading="lazy" class="aspect-[4/3] w-full rounded object-cover">
+                        @if($i === 0)<span class="absolute left-1.5 top-1.5 rounded bg-saluran-600 px-1.5 py-0.5 text-[10px] font-semibold text-white">Foto utama</span>@endif
+                    </a>
+                    @if($kelola)
+                        <form method="POST" action="{{ route('master.daerah-irigasi.foto.update', [$di, $f]) }}" class="mt-2 space-y-2 text-sm">
+                            @csrf @method('PATCH')
+                            <input name="judul" value="{{ $f->judul }}" maxlength="150" class="input py-1.5 text-sm" placeholder="Keterangan, mis. Walkthrough 2025 – Bendung" aria-label="Keterangan foto">
+                            <div class="flex gap-2">
+                                <input type="date" name="diambil_pada" value="{{ $f->diambil_pada?->toDateString() }}" max="{{ today()->toDateString() }}" class="input py-1.5 text-sm" aria-label="Tanggal foto">
+                                <button class="btn-ghost shrink-0 py-1.5">Simpan</button>
+                            </div>
+                            @if($i > 0)<button name="utama" value="1" class="text-xs font-semibold text-saluran-600">Jadikan foto utama</button>@endif
+                        </form>
+                        <form method="POST" action="{{ route('master.daerah-irigasi.foto.destroy', [$di, $f]) }}" onsubmit="return confirm('Hapus foto profil ini?')" class="mt-1">@csrf @method('DELETE')
+                            <button class="text-xs font-medium text-status-kritis">Hapus</button>
+                        </form>
+                    @else
+                        @if($f->judul || $f->diambil_pada)<p class="mt-1.5 text-xs text-basalt-soft">{{ $f->judul }}{{ $f->diambil_pada ? ' · '.$f->diambil_pada->translatedFormat('d M Y') : '' }}</p>@endif
+                    @endif
+                </div>
+            @endforeach
+        </div>
+    @endif
+    @if($kelola && $sisaProfil > 0)
+        <form method="POST" action="{{ route('master.daerah-irigasi.foto.store', $di) }}" enctype="multipart/form-data" class="mt-4 space-y-3 border-t border-savana-line pt-4" x-data="{ kirim: false }" @submit="kirim = true">
+            @csrf
+            <p class="text-sm font-semibold">Tambah foto profil</p>
+            <x-unggah-foto :maks="$sisaProfil"/>
+            <div class="grid gap-3 sm:grid-cols-3">
+                <label class="sm:col-span-2"><span class="label">Keterangan</span>
+                    <input name="judul" maxlength="150" list="saran-judul-profil" value="{{ old('judul') }}" class="input" placeholder="mis. Walkthrough 2025 – saluran induk">
+                    <datalist id="saran-judul-profil"><option value="Walkthrough {{ now()->year }}"><option value="ePAKSI {{ now()->year }}"><option value="Kondisi awal D.I."></datalist></label>
+                <label><span class="label">Tanggal foto</span><input type="date" name="diambil_pada" value="{{ old('diambil_pada') }}" max="{{ today()->toDateString() }}" class="input"></label>
+            </div>
+            @error('judul')<p class="text-xs font-medium text-status-kritis">{{ $message }}</p>@enderror
+            <button class="btn-primary" :disabled="kirim" x-text="kirim ? 'Mengunggah…' : 'Unggah foto profil'"></button>
+        </form>
+    @endif
+</section>
+
 <div class="grid gap-5 lg:grid-cols-4">
     <section class="panel p-5 lg:col-span-1">
         <x-status :s="$ring['status'] ?? 'kosong'"/>

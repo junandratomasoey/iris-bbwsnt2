@@ -31,7 +31,7 @@ class DetailDiService
         $p = $periode instanceof Periode ? $periode : null;
         $tgl = $p ? $p->sampai->copy() : $periode;
         $dariRiwayat = $p && $p->rekap() ? $p->dari->copy() : $tgl->copy()->subDays(self::HARI - 1);
-        $di->load(['kabupaten.wilayahSatgas', 'jadwalTanam', 'subDaerahIrigasi' => fn ($q) => $q->when($subIds !== null, fn ($w) => $w->whereIn('id', $subIds))]);
+        $di->load(['fotoProfil', 'kabupaten.wilayahSatgas', 'jadwalTanam', 'subDaerahIrigasi' => fn ($q) => $q->when($subIds !== null, fn ($w) => $w->whereIn('id', $subIds))]);
         $subs = $di->subDaerahIrigasi;
         if ($internal) {
             $subs->load('petugas:id,name,no_hp,jabatan');
@@ -53,6 +53,11 @@ class DetailDiService
                 'tenaga_op' => collect($di->tenaga_op ?? [])->filter()->map(fn ($v, $k) => ['label' => self::TENAGA[$k] ?? ucfirst($k), 'n' => (int) $v])->values(),
                 'url' => $internal ? route('master.daerah-irigasi.show', $di) : null,
             ],
+            'profil' => $di->fotoProfil->take(DaerahIrigasi::MAKS_FOTO_PROFIL)->map(fn ($f) => [
+                'kecil' => $f->url_kecil, 'besar' => $f->url, 'judul' => $f->judul,
+                'tanggal' => $f->diambil_pada?->translatedFormat('d M Y'),
+                'label' => trim(($f->judul ?? 'Foto profil D.I. '.$di->nama).($f->diambil_pada ? ' · '.$f->diambil_pada->translatedFormat('d M Y') : '')),
+            ])->values(),
             'ringkasan' => $ring ? collect($ring)->only(['status', 'status_label', 'warna', 'jumlah_sub', 'sub_lapor', 'luas_tanam_ha', 'luas_kering_ha', 'luas_puso_ha', 'luas_panen_ha', 'laporan_terakhir', 'mt']) : null,
             'jadwal' => $this->jadwal($di, $tgl),
             'sub' => $subs->map(fn ($s) => $this->sub($s, $terkini->get($s->id), $internal))->sortBy(fn ($s) => [-StatusKondisi::URUTAN[$s['status']], $s['nama']])->values(),
