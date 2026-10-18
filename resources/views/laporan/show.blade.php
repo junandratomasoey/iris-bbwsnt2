@@ -69,7 +69,7 @@
                 <a href="{{ $laporan->user->waLink('Selamat siang, terkait laporan IRIS '.$s->nama.' tanggal '.$laporan->tanggal->format('d/m/Y').':') }}" target="_blank" rel="noopener" class="btn-wa mt-2"><x-ikon n="wa" class="h-3.5 w-3.5"/> Hubungi via WhatsApp</a>
             @endif
             @if($laporan->lat)
-                <p class="mt-3 text-basalt-soft">Lokasi GPS: <a class="text-saluran-600 underline" target="_blank" rel="noopener" href="https://www.google.com/maps?q={{ $laporan->lat }},{{ $laporan->lng }}">{{ number_format($laporan->lat, 5) }}, {{ number_format($laporan->lng, 5) }}</a></p>
+                <p class="mt-3 text-basalt-soft">Titik lokasi: <a class="text-saluran-600 underline" target="_blank" rel="noopener" href="https://www.google.com/maps?q={{ $laporan->lat }},{{ $laporan->lng }}">{{ number_format($laporan->lat, 5) }}, {{ number_format($laporan->lng, 5) }}</a></p>
             @endif
         </section>
 

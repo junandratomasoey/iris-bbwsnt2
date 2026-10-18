@@ -20,6 +20,7 @@
     ];
     $sisaFoto = 5 - ($laporan->exists ? $laporan->foto->count() : 0);
     $luasSub = $subs->pluck('luas_ha', 'id');
+    $titikSub = $subs->mapWithKeys(fn ($s) => [$s->id => $s->titik()])->filter();
     $status = \App\Support\StatusKondisi::class;
 @endphp
 <x-layouts.app :title="$baru ? 'Isi laporan harian' : 'Ubah laporan'">
@@ -35,7 +36,7 @@
 
 <form method="POST" enctype="multipart/form-data"
       action="{{ $baru ? route('laporan.store') : route('laporan.update', $laporan) }}"
-      x-data="laporanForm({ baru: {{ $baru ? 'true' : 'false' }}, awal: @js($awal), sisaFoto: {{ $sisaFoto }}, luasSub: @js($luasSub) })"
+      x-data="laporanForm({ baru: {{ $baru ? 'true' : 'false' }}, awal: @js($awal), sisaFoto: {{ $sisaFoto }}, luasSub: @js($luasSub), titikSub: @js($titikSub) })"
       @submit="kirimForm" class="space-y-5">
     @csrf @if(! $baru) @method('PUT') @endif
 
@@ -155,15 +156,26 @@
             <textarea id="kendala" name="kendala" rows="3" x-model="f.kendala" class="input" placeholder="Mis. saluran sekunder bocor, debit sungai turun, perlu pompa"></textarea>
         </x-field>
         <div>
-            <span class="label">Lokasi GPS</span>
-            <div class="flex flex-wrap items-center gap-2 text-sm">
-                <input type="hidden" name="lat" :value="f.lat"><input type="hidden" name="lng" :value="f.lng">
-                <span x-show="f.lat" class="tabular-nums text-basalt-soft" x-text="`${f.lat}, ${f.lng}` + (gps.akurasi ? ` (±${gps.akurasi} m)` : '')"></span>
-                <span x-show="gps.status === 'mencari'" class="text-basalt-soft">Mencari lokasi…</span>
-                <span x-show="gps.status === 'gagal'" class="text-status-siaga">Lokasi tidak didapat. Aktifkan GPS lalu coba lagi.</span>
-                <button type="button" class="btn-ghost py-1" @click="ambilGps"><x-ikon n="lokasi" class="h-4 w-4"/> <span x-text="f.lat ? 'Perbarui' : 'Ambil lokasi'"></span></button>
+            <span class="label">Titik lokasi pengamatan</span>
+            <p class="-mt-0.5 mb-2 text-xs text-basalt-mute">Pakai GPS HP, ketik/tempel koordinat (mis. dari Google Maps), atau ketuk di peta.</p>
+            <div class="grid grid-cols-2 gap-2">
+                <label><span class="sr-only">Lintang</span>
+                    <input name="lat" x-model="f.lat" @input="lokasi = 'ketik'" @blur="rapikan('lat')" @paste="tempelKoordinat" inputmode="decimal" autocomplete="off" placeholder="Lintang, mis. -10.12345" class="input tabular-nums" :class="!latValid && 'border-status-kritis'"></label>
+                <label><span class="sr-only">Bujur</span>
+                    <input name="lng" x-model="f.lng" @input="lokasi = 'ketik'" @blur="rapikan('lng')" @paste="tempelKoordinat" inputmode="decimal" autocomplete="off" placeholder="Bujur, mis. 123.81234" class="input tabular-nums" :class="!lngValid && 'border-status-kritis'"></label>
+            </div>
+            <div class="mt-2 flex flex-wrap items-center gap-2 text-sm">
+                <button type="button" class="btn-ghost py-1" @click="ambilGps()"><x-ikon n="lokasi" class="h-4 w-4"/> GPS HP</button>
+                <button type="button" class="btn-ghost py-1" @click="togglePeta()" :aria-expanded="petaBuka"><x-ikon n="peta" class="h-4 w-4"/> <span x-text="petaBuka ? 'Tutup peta' : 'Pilih di peta'"></span></button>
+                <button type="button" x-show="f.lat || f.lng" class="py-1 text-xs font-medium text-basalt-soft hover:text-status-kritis" @click="f.lat = ''; f.lng = ''; lokasi = null">Kosongkan</button>
+                <span class="text-xs" :class="gps.status === 'gagal' || !koordinatValid ? 'text-status-siaga' : 'text-basalt-soft'" x-text="keteranganLokasi"></span>
+            </div>
+            <div x-show="petaBuka" x-cloak class="mt-2">
+                <div x-ref="petaLokasi" class="h-72 rounded border border-savana-line" role="application" aria-label="Peta untuk memilih titik lokasi"></div>
+                <p class="mt-1 text-xs text-basalt-mute">Ketuk peta untuk menaruh titik. Titik bisa digeser.</p>
             </div>
             @error('lat')<p class="mt-1 text-xs font-medium text-status-kritis">{{ $message }}</p>@enderror
+            @error('lng')<p class="mt-1 text-xs font-medium text-status-kritis">{{ $message }}</p>@enderror
         </div>
     </fieldset>
 

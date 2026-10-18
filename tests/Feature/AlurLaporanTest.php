@@ -150,4 +150,20 @@ class AlurLaporanTest extends TestCase
         $p = User::create(['name' => 'Kepala Balai', 'username' => 'kabalai', 'password' => 'x', 'role' => Role::PIMPINAN, 'must_change_password' => false]);
         $this->actingAs($p)->post('/laporan', $this->dataLaporan())->assertForbidden();
     }
+
+    public function test_koordinat_bisa_diisi_manual_dan_harus_lengkap(): void
+    {
+        $this->actingAs($this->petugas)->post('/laporan', $this->dataLaporan(['lat' => -10.1, 'lng' => '']))
+            ->assertSessionHasErrors('lng');
+        $this->actingAs($this->petugas)->post('/laporan', $this->dataLaporan(['lat' => -10.1234567, 'lng' => 130]))
+            ->assertSessionHasErrors('lng');
+
+        $this->actingAs($this->petugas)->post('/laporan', $this->dataLaporan(['lat' => '', 'lng' => '']))->assertSessionHasNoErrors();
+        $l = LaporanHarian::firstOrFail();
+        $this->assertNull($l->lat);
+
+        $this->actingAs($this->petugas)->put(route('laporan.update', $l), $this->dataLaporan(['lat' => '-10.1458321', 'lng' => '123.8112345']))
+            ->assertSessionHasNoErrors();
+        $this->assertEqualsWithDelta(-10.1458321, $l->fresh()->lat, 1e-7);
+    }
 }

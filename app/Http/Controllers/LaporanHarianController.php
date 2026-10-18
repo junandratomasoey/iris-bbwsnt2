@@ -193,7 +193,7 @@ class LaporanHarianController extends Controller
     {
         $ids = $request->user()->subIdsPelaporan();
 
-        return SubDaerahIrigasi::with('daerahIrigasi:id,nama')
+        return SubDaerahIrigasi::with('daerahIrigasi:id,nama,lat,lng')
             ->when($ids !== null, fn ($q) => $q->whereIn('id', $ids))
             ->orderBy('daerah_irigasi_id')->orderBy('nama')->get();
     }
@@ -221,16 +221,18 @@ class LaporanHarianController extends Controller
             'luas_panen_ha' => ['required', 'numeric', 'min:0', 'max:20000'],
             'luas_puso_ha' => ['required', 'numeric', 'min:0', 'lte:luas_tanam_ha'],
             'kendala' => ['nullable', 'string', 'max:2000'],
-            'lat' => ['nullable', 'numeric', 'between:-12,-7'],
-            'lng' => ['nullable', 'numeric', 'between:118,126'],
+            'lat' => ['nullable', 'required_with:lng', 'numeric', 'between:-12,-7'],
+            'lng' => ['nullable', 'required_with:lat', 'numeric', 'between:118,126'],
             'foto' => ['nullable', 'array', 'max:'.max(0, $maksFoto)],
             'foto.*' => ['image', 'max:8192'],
         ], [
             'sub_daerah_irigasi_id.unique' => 'Sub-D.I. ini sudah punya laporan pada tanggal tersebut. Buka laporan itu untuk mengubahnya.',
             'tanggal.after_or_equal' => 'Laporan hanya bisa diisi untuk 7 hari terakhir.',
             'lte' => ':attribute tidak boleh lebih besar dari luas tanam.',
-            'lat.between' => 'Koordinat di luar wilayah NTT. Periksa GPS.',
-            'lng.between' => 'Koordinat di luar wilayah NTT. Periksa GPS.',
+            'lat.between' => 'Lintang harus antara -12 dan -7 (wilayah NTT). Periksa koordinat.',
+            'lng.between' => 'Bujur harus antara 118 dan 126 (wilayah NTT). Periksa koordinat.',
+            'lat.required_with' => 'Isi lintang dan bujur sekaligus.',
+            'lng.required_with' => 'Isi lintang dan bujur sekaligus.',
             'foto.max' => 'Maksimal 5 foto per laporan.',
         ], [
             'sub_daerah_irigasi_id' => 'Sub-D.I.', 'debit_intake_lps' => 'debit intake', 'tma_cm' => 'TMA',
