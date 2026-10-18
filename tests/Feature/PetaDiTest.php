@@ -136,4 +136,16 @@ class PetaDiTest extends TestCase
         $this->actingAs($this->admin)->get(route('master.peta.import'))->assertOk();
         $this->actingAs($this->admin)->get(route('master.peta.unduh', ['lapisan' => 'baku']))->assertOk();
     }
+
+    public function test_file_batas_wilayah_ntt_valid(): void
+    {
+        $data = json_decode(file_get_contents(public_path('geojson/wilayah-ntt.geojson')), true);
+        $this->assertSame('FeatureCollection', $data['type']);
+        $this->assertCount(21, $data['features']);
+        $nama = collect($data['features'])->pluck('properties.nama');
+        $this->assertTrue($nama->contains('Kabupaten Kupang') && $nama->contains('Kota Kupang'));
+        // koordinat WGS84 di sekitar NTT (bukan UTM meter)
+        $titik = $data['features'][0]['geometry']['coordinates'][0][0][0];
+        $this->assertTrue($titik[0] > 118 && $titik[0] < 126 && $titik[1] > -12 && $titik[1] < -7);
+    }
 }

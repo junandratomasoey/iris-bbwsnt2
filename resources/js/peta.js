@@ -6,8 +6,19 @@ const fmt = (v, d = 0) => (v === null || v === undefined || v === '') ? '–'
     : Number(v).toLocaleString('id-ID', { minimumFractionDigits: d, maximumFractionDigits: d });
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
+const WARNA_NTT = '#F2A65A'; // oranye muda: daratan wilayah NTT
+
 function baseLayers() {
     return {
+        // peta dasar terang agar wilayah NTT (oranye muda) dan warna status D.I. menonjol
+        'Peta terang': L.layerGroup([
+            L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+                maxZoom: 16, attribution: 'Tiles &copy; Esri',
+            }),
+            L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}', {
+                maxZoom: 16, pane: 'shadowPane',
+            }),
+        ]),
         'Peta jalan': L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 19, attribution: '&copy; OpenStreetMap',
         }),
@@ -119,6 +130,7 @@ export function createMap(opsi) {
     const awal = new URLSearchParams(window.location.search);
     // Objek Leaflet disimpan di luar state Alpine agar tidak dibungkus Proxy reaktif.
     let map = null;
+    let wilayah = null; // lapisan batas kabupaten NTT
     const geo = {};
     let layers = {};
     let aturTitikFn = null;
@@ -144,7 +156,7 @@ export function createMap(opsi) {
         kabupaten: '',
         satgas: '',
         status: { aman: true, waspada: true, siaga: true, kritis: true, kosong: true },
-        lapis: { fungsional: true, baku: false, potensial: false, sub: !!opsi.internal, kejadian: true, bangunan: false },
+        lapis: { wilayah: true, fungsional: true, baku: false, potensial: false, sub: !!opsi.internal, kejadian: true, bangunan: false },
         data: null,
         memuat: true,
         galat: null,
@@ -202,12 +214,17 @@ export function createMap(opsi) {
         },
 
         async init() {
-            map = L.map(this.$refs.peta, { zoomControl: false, preferCanvas: true }).fitBounds(BATAS_NTT);
+            map = L.map(this.$refs.peta, { zoomControl: false, preferCanvas: true, zoomSnap: 0.25 }).fitBounds(BATAS_NTT, { padding: [8, 8] });
+            // ukuran kontainer baru final setelah panel samping tampil → hitung ulang agar seluruh NTT terlihat
+            requestAnimationFrame(() => { map.invalidateSize(); map.fitBounds(BATAS_NTT, { padding: [8, 8] }); });
             L.control.zoom({ position: 'bottomright' }).addTo(map);
             L.control.scale({ imperial: false, position: 'bottomleft' }).addTo(map);
             const base = baseLayers();
-            base['Peta jalan'].addTo(map);
+            base['Peta terang'].addTo(map);
             L.control.layers(base, null, { position: 'bottomright' }).addTo(map);
+            // batas kabupaten NTT di bawah poligon D.I.
+            map.createPane('wilayah').style.zIndex = 350;
+            this.muatWilayah();
 
             await Promise.all(['fungsional', 'baku', 'potensial'].map(async (n) => {
                 try {
@@ -226,6 +243,7 @@ export function createMap(opsi) {
             ['periode', 'dari', 'sampai', 'warna'].forEach((k) => this.$watch(k, muatUlang));
             if (this.periode === 'rentang' && !this.dari) this.dari = this.sampai;
             ['kabupaten', 'satgas', 'status', 'lapis', 'statusKejadian'].forEach((k) => this.$watch(k, () => this.gambar(), { deep: true }));
+            this.$watch('kabupaten', () => this.gayaWilayah());
             let jeda = null;
             this.$watch('cari', () => { clearTimeout(jeda); jeda = setTimeout(() => this.gambarKejadian(), 250); });
         },
@@ -245,14 +263,35 @@ export function createMap(opsi) {
             this.memuat = false;
         },
 
+        /** Daratan NTT per kabupaten (SHP batas administrasi), diisi oranye muda; kabupaten terpilih lebih tegas. */
+        async muatWilayah() {
+            try {
+                const r = await fetch(`${ASSET}/geojson/wilayah-ntt.geojson?v=${GEOJSON_VERSI}`);
+                const data = await r.json();
+                wilayah = L.geoJSON(data, { pane: 'wilayah', renderer: L.canvas({ pane: 'wilayah' }), interactive: false, style: () => ({}) });
+                this.gayaWilayah();
+                if (this.lapis.wilayah) wilayah.addTo(map);
+            } catch (e) { wilayah = null; }
+        },
+        gayaWilayah() {
+            if (!wilayah) return;
+            const pilih = this.kabupaten;
+            wilayah.setStyle((f) => {
+                const nama = f.properties.nama.replace(/^Kabupaten\s+/, '');
+                const aktif = !pilih || nama === pilih;
+                return { color: '#ffffff', weight: aktif && pilih ? 1.6 : 0.8, fillColor: WARNA_NTT, fillOpacity: aktif ? 0.7 : 0.22 };
+            });
+        },
+
         gambar() {
+            if (wilayah) { if (this.lapis.wilayah) wilayah.addTo(map); else map.removeLayer(wilayah); }
             Object.values(layers).forEach((l) => map.removeLayer(l));
             layers = {};
             if (!this.data) return;
             const diByKode = Object.fromEntries(this.data.daerah_irigasi.map((d) => [d.kode, d]));
 
             const gaya = {
-                fungsional: { weight: 1.5, fillOpacity: 0.45 },
+                fungsional: { weight: 1.5, fillOpacity: 0.75 },
                 baku: { weight: 1.5, fillOpacity: 0, dashArray: '5 4' },
                 potensial: { weight: 1, fillOpacity: 0.12, dashArray: '2 4' },
             };

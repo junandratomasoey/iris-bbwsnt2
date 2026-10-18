@@ -99,6 +99,7 @@ php artisan view:clear
 ## Data sumber
 
 - `Kompilasi_Template_Kekeringan_Sawah_BBWS_NT_II.xlsx` → `database/seeders/data/master.json`
+- `D:\shp_indra\New folder\01. SHP_NTT\SHP_admin_NTT` (batas administrasi 2008, UTM 51S) → `public/geojson/wilayah-ntt.geojson`: daratan NTT per kabupaten (oranye muda di peta), diolah dengan `database/sumber/olah_batas_ntt.py`. Malaka masih tergabung di Belu.
 - `D:\OP\BBWS NT2 _ Peta IGT` (BAKU_NTT, Fungsional_BWS_NTII, Potensial_BWS_NTII) → `public/geojson/{baku,fungsional,potensial}.geojson`
   - diproyeksikan ulang dari World Cylindrical Equal Area ke WGS84, digabung per D.I., disederhanakan ±15 m
   - luas dihitung dari geometri (kolom `L_Baku` di layer Fungsional terulang per potongan poligon, jadi tidak dipakai)

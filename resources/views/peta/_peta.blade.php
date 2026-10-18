@@ -82,6 +82,7 @@
                     <label class="flex items-center gap-1.5"><input type="checkbox" x-model="lapis.fungsional" class="rounded border-savana-line text-saluran-600"> Areal fungsional</label>
                     <label class="flex items-center gap-1.5"><input type="checkbox" x-model="lapis.baku" class="rounded border-savana-line text-saluran-600"> Luas baku</label>
                     <label class="flex items-center gap-1.5"><input type="checkbox" x-model="lapis.potensial" class="rounded border-savana-line text-saluran-600"> Areal potensial</label>
+                    <label class="flex items-center gap-1.5"><input type="checkbox" x-model="lapis.wilayah" class="rounded border-savana-line text-saluran-600"> Wilayah NTT</label>
                     <label class="flex items-center gap-1.5"><input type="checkbox" x-model="lapis.kejadian" class="rounded border-savana-line text-saluran-600"> Titik kejadian</label>
                     @if($internal)
                         <label class="flex items-center gap-1.5"><input type="checkbox" x-model="lapis.sub" class="rounded border-savana-line text-saluran-600"> Sub-D.I.</label>
@@ -176,6 +177,7 @@
                 <p class="flex items-center gap-1.5"><span class="h-2.5 w-3.5 rounded-sm" style="background: {{ \App\Support\StatusKondisi::WARNA[$k] }}"></span>{{ $l }}</p>
             @endforeach
             <p class="mt-1 flex items-center gap-1.5"><svg width="12" height="12" viewBox="0 0 18 18"><path d="M9 1.5 17 16H1z" fill="#B3261E"/></svg>Kejadian kekeringan</p>
+            <p class="flex items-center gap-1.5"><span class="h-2.5 w-3.5 rounded-sm border border-white" style="background: #F2A65A"></span>Wilayah NTT (batas kabupaten)</p>
             @if($internal)<p class="flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-full border-2 border-white bg-status-aman ring-1 ring-basalt-mute"></span>Sub-D.I.</p>@endif
         </div>
     </div>
