@@ -133,4 +133,24 @@ class DetailDiDanInfrastrukturTest extends TestCase
         $this->actingAs($this->petugas)->getJson(route('api.di', $this->diLain))->assertForbidden();
         $this->actingAs($this->admin)->getJson(route('api.di', $this->diLain))->assertOk();
     }
+
+    public function test_impor_siga_mengisi_kosong_tanpa_menimpa_isian_aplikasi(): void
+    {
+        $oesao = DaerahIrigasi::create(['kode' => 'DI-03', 'nama' => 'Oesao']);
+        $lama = Bangunan::create(['daerah_irigasi_id' => $oesao->id, 'nama' => 'Bendung Oesao', 'jenis' => 'bendung', 'kondisi' => 'rusak_berat', 'kondisi_per' => '2026-10-01']);
+        Bangunan::create(['daerah_irigasi_id' => $oesao->id, 'nama' => 'Bendung Dalam Kom', 'jenis' => 'bendung']);
+
+        $this->seed(\Database\Seeders\InfrastrukturSigaSeeder::class);
+        $this->seed(\Database\Seeders\InfrastrukturSigaSeeder::class); // dijalankan ulang: tidak ganda
+
+        $lama->refresh();
+        $this->assertNotNull($lama->lat);
+        $this->assertSame('rusak_berat', $lama->kondisi);                  // isian dari aplikasi tetap
+        $this->assertSame('Tetap', $lama->data_teknis['Tipe bendung']);
+        $this->assertTrue(Bangunan::where('nama', 'Bendung Dalam Kom 2')->exists());   // diberi nomor
+        $this->assertSame(1, Bangunan::where('nama', 'Bendung Pukdale')->count());     // baru, tidak ganda
+        $this->assertSame('baik', Bangunan::where('nama', 'Bendung Pukdale')->value('kondisi'));
+
+        $this->getJson(route('api.publik.di', $oesao))->assertOk()->assertJsonPath('bangunan.0.teknis.0.label', fn ($v) => is_string($v));
+    }
 }

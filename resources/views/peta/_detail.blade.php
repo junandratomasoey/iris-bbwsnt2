@@ -162,6 +162,14 @@
                         <p class="text-basalt-mute" x-text="[b.jenis, b.sub, b.lokasi].filter(Boolean).join(' · ')"></p>
                         <p class="mt-0.5 flex items-center gap-1.5"><span class="h-2 w-2 rounded-full" :style="`background:${b.warna}`"></span><span class="font-medium" x-text="b.kondisi_label"></span><span class="text-basalt-mute" x-show="b.kondisi_per" x-text="'per ' + b.kondisi_per"></span></p>
                         <p x-show="b.keterangan" class="mt-0.5 text-basalt-soft" x-text="b.keterangan"></p>
+                        <details x-show="b.teknis.length" class="mt-1 group/t">
+                            <summary class="cursor-pointer select-none font-semibold text-saluran-600">Data teknis</summary>
+                            <dl class="mt-1 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 rounded bg-savana px-2 py-1.5">
+                                <template x-for="t in b.teknis" :key="t.label">
+                                    <div class="contents"><dt class="text-basalt-mute" x-text="t.label"></dt><dd class="text-basalt" x-text="t.nilai"></dd></div>
+                                </template>
+                            </dl>
+                        </details>
                         <p class="mt-1 flex gap-3">
                             <button type="button" x-show="b.lat" @click="fokusBangunan(b)" class="font-semibold text-saluran-600">Lihat di peta</button>
                             @if($internal)<a x-show="b.url" :href="b.url" class="font-semibold text-saluran-600">Ubah</a>@endif

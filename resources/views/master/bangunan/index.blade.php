@@ -33,7 +33,7 @@
         <tbody>
         @forelse($bangunan as $b)
             <tr>
-                <td class="font-medium">{{ $b->nama }}@if($b->lokasi)<div class="text-xs text-basalt-mute">{{ $b->lokasi }}</div>@endif</td>
+                <td class="font-medium">{{ $b->nama }}@if($b->lokasi)<div class="text-xs text-basalt-mute">{{ $b->lokasi }}</div>@endif @if($b->data_teknis)<span class="mt-0.5 inline-block rounded bg-saluran-50 px-1.5 text-[10px] font-semibold text-saluran-700" title="Punya data teknis dari SIGA">SIGA</span>@endif</td>
                 <td>{{ $b->jenis_label }}</td>
                 <td>{{ $b->daerahIrigasi?->nama }}@if($b->subDaerahIrigasi)<div class="text-xs text-basalt-mute">{{ $b->subDaerahIrigasi->nama }}</div>@endif</td>
                 <td><span class="inline-flex items-center gap-1.5 text-sm"><span class="h-2.5 w-2.5 rounded-full" style="background: {{ $b->warna_kondisi }}"></span>{{ $b->kondisi_label }}</span>

@@ -164,6 +164,8 @@ class DetailDiService
                 'kondisi' => $b->kondisi, 'kondisi_label' => $b->kondisi_label, 'warna' => $b->warna_kondisi,
                 'kondisi_per' => $b->kondisi_per?->translatedFormat('d M Y'),
                 'keterangan' => $b->keterangan,
+                // "Kode integrasi" sudah tampil sebagai kode aset; "Nama di SIGA" hanya relevan untuk admin
+                'teknis' => collect($b->data_teknis ?? [])->except(['Kode integrasi', 'Nama di SIGA'])->map(fn ($v, $k) => ['label' => $k, 'nilai' => (string) $v])->values(),
                 'lat' => $b->lat, 'lng' => $b->lng,
                 'foto' => $b->foto->take(8)->map(fn ($f) => ['kecil' => $f->url_kecil, 'besar' => $f->url, 'label' => $b->nama.' · '.$f->created_at->translatedFormat('d M Y')])->values(),
                 'url' => $boleh ? route('master.bangunan.edit', $b) : null,

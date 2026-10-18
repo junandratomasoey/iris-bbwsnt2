@@ -33,9 +33,9 @@ class Bangunan extends Model
 
     public const MAKS_FOTO = 12;
 
-    protected $fillable = ['daerah_irigasi_id', 'sub_daerah_irigasi_id', 'nama', 'jenis', 'lokasi', 'kondisi', 'kondisi_per', 'lat', 'lng', 'keterangan'];
+    protected $fillable = ['daerah_irigasi_id', 'sub_daerah_irigasi_id', 'nama', 'kode_aset', 'data_teknis', 'jenis', 'lokasi', 'kondisi', 'kondisi_per', 'lat', 'lng', 'keterangan'];
 
-    protected $casts = ['lat' => 'float', 'lng' => 'float', 'kondisi_per' => Tanggal::class];
+    protected $casts = ['lat' => 'float', 'lng' => 'float', 'kondisi_per' => Tanggal::class, 'data_teknis' => 'array'];
 
     protected static function booted(): void
     {

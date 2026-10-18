@@ -51,6 +51,17 @@
 
     <div class="flex gap-2"><button class="btn-primary px-8" :disabled="kirim" x-text="kirim ? 'Menyimpan…' : 'Simpan'"></button><a href="{{ route('master.bangunan.index', ['di' => $bangunan->daerah_irigasi_id]) }}" class="btn-ghost">Kembali</a></div>
 </form>
+@if(! $baru && $bangunan->data_teknis)
+    <section class="panel mt-5 p-5">
+        <h2 class="text-lg font-semibold">Data teknis</h2>
+        <p class="text-sm text-basalt-soft">Dari data SIGA / shapefile BBWS NT II{{ $bangunan->kode_aset ? ' · kode '.$bangunan->kode_aset : '' }}. Tampil juga di peta.</p>
+        <dl class="mt-3 grid gap-x-6 gap-y-1.5 text-sm sm:grid-cols-2">
+            @foreach($bangunan->data_teknis as $k => $v)
+                <div class="flex justify-between gap-3 border-b border-savana-line py-1"><dt class="text-basalt-soft">{{ $k }}</dt><dd class="text-right font-medium">{{ $v }}</dd></div>
+            @endforeach
+        </dl>
+    </section>
+@endif
 @if(! $baru && $bangunan->foto->isNotEmpty())
     <section class="panel mt-5 p-5">
         <h2 class="mb-3 text-lg font-semibold">Foto tersimpan</h2>
