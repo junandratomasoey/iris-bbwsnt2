@@ -33,7 +33,8 @@ class PetaController extends Controller
         $di = $this->kondisi->ringkasanDi($tgl)->values()
             ->map(fn ($d) => collect($d)->except(['sub_per_status', 'debit_total_lps'])->all());
 
-        $kejadian = Kejadian::with('kabupaten:id,nama', 'foto')->whereNotNull('lat')->get()->map(fn ($k) => [
+        $kejadian = Kejadian::with('kabupaten:id,nama', 'daerahIrigasi:id,nama', 'foto')->whereNotNull('lat')->get()->map(fn ($k) => [
+            'id' => $k->id, 'di' => $k->daerahIrigasi?->nama,
             'lat' => $k->lat, 'lng' => $k->lng, 'jenis' => $k->jenis_kegagalan, 'penyebab' => $k->penyebab,
             'desa' => $k->desa, 'kecamatan' => $k->kecamatan, 'kabupaten' => $k->kabupaten?->nama,
             'luas_terdampak_ha' => (float) $k->luas_terdampak_ha, 'luas_tertangani_ha' => (float) $k->luas_tertangani_ha,
@@ -81,9 +82,10 @@ class PetaController extends Controller
                 ];
             })->filter()->values();
 
-        $kejadian = Kejadian::with('kabupaten:id,nama', 'foto')->whereNotNull('lat')
+        $kejadian = Kejadian::with('kabupaten:id,nama', 'daerahIrigasi:id,nama', 'foto')->whereNotNull('lat')
             ->when($subIds !== null, fn ($q) => $q->where(fn ($w) => $w->whereNull('sub_daerah_irigasi_id')->orWhereIn('sub_daerah_irigasi_id', $subIds)))
             ->get()->map(fn ($k) => [
+                'id' => $k->id, 'di' => $k->daerahIrigasi?->nama,
                 'lat' => $k->lat, 'lng' => $k->lng, 'jenis' => $k->jenis_kegagalan, 'penyebab' => $k->penyebab,
                 'desa' => $k->desa, 'kecamatan' => $k->kecamatan, 'kabupaten' => $k->kabupaten?->nama,
                 'luas_terdampak_ha' => (float) $k->luas_terdampak_ha, 'status' => $k->status_penanganan,

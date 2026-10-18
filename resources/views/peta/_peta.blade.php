@@ -2,7 +2,7 @@
 <div x-data="peta({ internal: {{ $internal ? 'true' : 'false' }}, api: '{{ $api }}' })" class="relative flex h-full min-h-0">
     {{-- panel samping --}}
     <aside x-show="panel" x-cloak
-           class="absolute inset-y-0 left-0 z-[500] flex w-[22rem] max-w-[90vw] flex-col border-r border-savana-line bg-white lg:static lg:z-auto">
+           class="absolute inset-y-0 left-0 z-[500] flex w-[22rem] max-w-[90vw] flex-col overflow-y-auto border-r border-savana-line bg-white lg:static lg:z-auto">
         <div class="border-b border-savana-line p-4">
             <div class="flex items-start justify-between gap-2">
                 <div>
@@ -70,8 +70,25 @@
             </fieldset>
         </div>
 
-        <ul class="flex-1 divide-y divide-savana-line overflow-y-auto" aria-label="Daftar D.I.">
-            <template x-for="d in [...diTampil].sort((a, b) => ({kritis:0,siaga:1,waspada:2,aman:3,kosong:4})[a.status] - ({kritis:0,siaga:1,waspada:2,aman:3,kosong:4})[b.status] || a.nama.localeCompare(b.nama))" :key="d.id">
+        {{-- pencarian + tab daftar (menempel di atas saat panel digulir) --}}
+        <div class="sticky top-0 z-10 border-b border-savana-line bg-white px-4 pb-0 pt-3">
+            <label class="relative block">
+                <span class="sr-only">Cari</span>
+                <svg class="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-basalt-mute" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+                <input type="search" x-model="cari" class="input pl-8" :placeholder="tab === 'di' ? 'Cari D.I. atau kabupaten' : 'Cari desa, kecamatan, kabupaten, jenis…'" autocomplete="off">
+            </label>
+            <div class="mt-2 flex" role="tablist">
+                <button type="button" role="tab" :aria-selected="tab === 'di'" @click="tab = 'di'" :class="tab === 'di' ? 'border-saluran-600 text-saluran-700' : 'border-transparent text-basalt-soft'" class="-mb-px flex-1 border-b-2 py-2 text-sm font-semibold">
+                    Daerah Irigasi <span class="ml-0.5 rounded-full bg-savana-deep px-1.5 text-xs" x-text="diDaftar.length"></span>
+                </button>
+                <button type="button" role="tab" :aria-selected="tab === 'kejadian'" @click="tab = 'kejadian'" :class="tab === 'kejadian' ? 'border-saluran-600 text-saluran-700' : 'border-transparent text-basalt-soft'" class="-mb-px flex-1 border-b-2 py-2 text-sm font-semibold">
+                    Kejadian <span class="ml-0.5 rounded-full bg-savana-deep px-1.5 text-xs" x-text="kejadianTampil.length"></span>
+                </button>
+            </div>
+        </div>
+
+        <ul x-show="tab === 'di'" class="divide-y divide-savana-line" aria-label="Daftar D.I.">
+            <template x-for="d in diDaftar" :key="d.id">
                 <li>
                     <button type="button" @click="fokus(d)" class="flex w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-savana">
                         <span class="h-8 w-1.5 shrink-0 rounded-full" :style="`background:${d.warna}`"></span>
@@ -86,8 +103,44 @@
                     </button>
                 </li>
             </template>
-            <li x-show="data && !diTampil.length" class="p-6 text-center text-sm text-basalt-soft">Tidak ada D.I. yang cocok dengan filter.</li>
+            <li x-show="data && !diDaftar.length" class="p-6 text-center text-sm text-basalt-soft">Tidak ada D.I. yang cocok.</li>
         </ul>
+
+        <div x-show="tab === 'kejadian'" x-cloak>
+            <div class="flex items-center gap-2 px-4 py-2 text-xs">
+                <select x-model="statusKejadian" class="input py-1 text-xs" aria-label="Status penanganan">
+                    <option value="">Semua status penanganan</option>
+                    @foreach(array_keys(\App\Models\Kejadian::STATUS) as $st)<option>{{ $st }}</option>@endforeach
+                </select>
+            </div>
+            <p class="px-4 pb-2 text-xs text-basalt-soft"><span x-text="kejadianTampil.length"></span> lokasi · <span x-text="fmt(luasKejadian, 1)"></span> Ha terdampak</p>
+            <ul class="divide-y divide-savana-line border-t border-savana-line" aria-label="Daftar kejadian">
+                <template x-for="k in kejadianTampil" :key="k.id">
+                    <li>
+                        <button type="button" @click="fokusKejadian(k)" class="flex w-full items-start gap-3 px-4 py-2.5 text-left hover:bg-savana">
+                            <template x-if="k.foto && k.foto.length">
+                                <img :src="k.foto[0].kecil" alt="" loading="lazy" class="h-12 w-14 shrink-0 rounded object-cover">
+                            </template>
+                            <template x-if="!k.foto || !k.foto.length">
+                                <span class="flex h-12 w-14 shrink-0 items-center justify-center rounded bg-savana-deep">
+                                    <svg width="16" height="16" viewBox="0 0 18 18" aria-hidden="true"><path d="M9 1.5 17 16H1z" :fill="k.warna"/></svg>
+                                </span>
+                            </template>
+                            <span class="min-w-0 flex-1">
+                                <span class="block truncate text-sm font-semibold" x-text="`${k.jenis} — ${k.desa || k.kecamatan || k.kabupaten}`"></span>
+                                <span class="block truncate text-xs text-basalt-soft" x-text="[k.kecamatan, k.kabupaten].filter(Boolean).join(', ') + (k.di ? ' · D.I. ' + k.di : '')"></span>
+                                <span class="mt-0.5 flex items-center gap-1.5 text-xs">
+                                    <span class="h-2 w-2 rounded-full" :style="`background:${k.warna}`"></span>
+                                    <span x-text="k.status"></span>
+                                    <span class="text-basalt-mute" x-text="'· ' + fmt(k.luas_terdampak_ha, 1) + ' Ha'"></span>
+                                </span>
+                            </span>
+                        </button>
+                    </li>
+                </template>
+                <li x-show="data && !kejadianTampil.length" class="p-6 text-center text-sm text-basalt-soft">Tidak ada kejadian yang cocok.</li>
+            </ul>
+        </div>
     </aside>
 
     <div class="relative min-w-0 flex-1">

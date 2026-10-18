@@ -115,6 +115,9 @@ export function createMap(opsi) {
     const geo = {};
     let layers = {};
     let aturTitikFn = null;
+    const markerKejadian = new Map(); // id → marker, untuk membuka popup dari daftar
+    const URUT_KEJADIAN = { 'Perlu Penanganan': 0, 'Dalam Penanganan': 1, 'Selesai Ditangani': 2, 'Tidak Perlu Penanganan': 3 };
+    const normal = (t) => String(t ?? '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/^(d\.?\s*i\.?\s+)/, '');
 
     return {
         internal: !!opsi.internal,
@@ -127,10 +130,36 @@ export function createMap(opsi) {
         memuat: true,
         galat: null,
         panel: window.innerWidth >= 1024,
+        tab: 'di',
+        cari: '',
+        statusKejadian: '',
 
         get diTampil() {
             if (!this.data) return [];
             return this.data.daerah_irigasi.filter((d) => this.cocok(d));
+        },
+        /** Daftar D.I. di panel: ikut filter + kata pencarian. */
+        get diDaftar() {
+            const q = normal(this.cari).trim();
+            return this.diTampil
+                .filter((d) => !q || normal(`${d.nama} ${d.kabupaten ?? ''}`).includes(q))
+                .sort((a, b) => ({ kritis: 0, siaga: 1, waspada: 2, aman: 3, kosong: 4 })[a.status] - ({ kritis: 0, siaga: 1, waspada: 2, aman: 3, kosong: 4 })[b.status] || a.nama.localeCompare(b.nama));
+        },
+        get kejadianTampil() {
+            if (!this.data) return [];
+            const kata = normal(this.cari).trim().split(/\s+/).filter(Boolean);
+            return this.data.kejadian
+                .filter((k) => !this.kabupaten || k.kabupaten === this.kabupaten)
+                .filter((k) => !this.statusKejadian || k.status === this.statusKejadian)
+                .filter((k) => {
+                    if (!kata.length) return true;
+                    const teks = normal([k.desa, k.kecamatan, k.kabupaten, k.jenis, k.penyebab, k.status, k.di].join(' '));
+                    return kata.every((w) => teks.includes(w));
+                })
+                .sort((a, b) => (URUT_KEJADIAN[a.status] ?? 9) - (URUT_KEJADIAN[b.status] ?? 9) || b.luas_terdampak_ha - a.luas_terdampak_ha);
+        },
+        get luasKejadian() {
+            return this.kejadianTampil.reduce((t, k) => t + (k.luas_terdampak_ha || 0), 0);
         },
         get rekap() {
             const r = { aman: 0, waspada: 0, siaga: 0, kritis: 0, kosong: 0, luas: 0, kering: 0, puso: 0 };
@@ -162,7 +191,9 @@ export function createMap(opsi) {
             }));
             await this.muat();
             ['tanggal'].forEach((k) => this.$watch(k, () => this.muat()));
-            ['kabupaten', 'satgas', 'status', 'lapis'].forEach((k) => this.$watch(k, () => this.gambar(), { deep: true }));
+            ['kabupaten', 'satgas', 'status', 'lapis', 'statusKejadian'].forEach((k) => this.$watch(k, () => this.gambar(), { deep: true }));
+            let jeda = null;
+            this.$watch('cari', () => { clearTimeout(jeda); jeda = setTimeout(() => this.gambarKejadian(), 250); });
         },
 
         async muat() {
@@ -256,14 +287,7 @@ export function createMap(opsi) {
                 layers.sub = lyr;
             }
 
-            if (this.lapis.kejadian) {
-                const lyr = L.layerGroup();
-                this.data.kejadian.forEach((k) => {
-                    if (this.kabupaten && k.kabupaten !== this.kabupaten) return;
-                    L.marker([k.lat, k.lng], { icon: ikonKejadian(k.warna) }).bindPopup(popupKejadian(k, this.internal), { maxWidth: 260 }).addTo(lyr);
-                });
-                layers.kejadian = lyr.addTo(map);
-            }
+            this.gambarKejadian();
 
             if (this.lapis.bangunan && this.data.bangunan) {
                 const lyr = L.layerGroup();
@@ -271,6 +295,29 @@ export function createMap(opsi) {
                 layers.bangunan = lyr.addTo(map);
             }
             if (aturTitikFn) aturTitikFn();
+        },
+
+        /** Titik kejadian di peta mengikuti filter kabupaten, status, dan kata pencarian. */
+        gambarKejadian() {
+            if (layers.kejadian) map.removeLayer(layers.kejadian);
+            layers.kejadian = null;
+            markerKejadian.clear();
+            if (!this.lapis.kejadian || !this.data) return;
+            const lyr = L.layerGroup();
+            this.kejadianTampil.forEach((k) => {
+                const m = L.marker([k.lat, k.lng], { icon: ikonKejadian(k.warna) }).bindPopup(popupKejadian(k, this.internal), { maxWidth: 260 }).addTo(lyr);
+                markerKejadian.set(k.id, m);
+            });
+            layers.kejadian = lyr.addTo(map);
+        },
+
+        fokusKejadian(k) {
+            if (!this.lapis.kejadian) this.lapis.kejadian = true; // memicu gambar ulang
+            if (window.innerWidth < 1024) this.panel = false;
+            setTimeout(() => {
+                map.flyTo([k.lat, k.lng], Math.max(map.getZoom(), 13), { duration: 0.8 });
+                setTimeout(() => markerKejadian.get(k.id)?.openPopup(), 850);
+            }, 50);
         },
 
         fokus(d) {
