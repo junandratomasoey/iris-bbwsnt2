@@ -12,13 +12,14 @@
     <h2 class="font-gauge text-[26px] font-semibold leading-tight" x-text="'D.I. ' + diPilih.nama"></h2>
     <div class="mt-1.5 flex flex-wrap items-center gap-2 text-xs">
         <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 font-semibold" :style="`background:${diPilih.warna}22`"><span class="h-2 w-2 rounded-full" :style="`background:${diPilih.warna}`"></span><span x-text="diPilih.status_label"></span></span>
-        <span class="text-basalt-soft" x-text="diPilih.mt ? diPilih.mt + ' berjalan' : 'MT belum dijadwalkan'"></span>
+        <span class="text-basalt-soft" x-text="modeRekap ? `status ${warna} · ${data?.periode?.label}` : (diPilih.mt ? diPilih.mt + ' berjalan' : 'MT belum dijadwalkan')"></span>
     </div>
     <dl class="mt-3 grid grid-cols-2 gap-px overflow-hidden rounded-md border border-savana-line bg-savana-line text-sm">
         <div class="bg-white px-3 py-2"><dt class="text-[11px] text-basalt-soft">Luas fungsional</dt><dd class="font-gauge text-xl font-semibold leading-tight"><span x-text="fmt(diPilih.luas_ha)"></span> <span class="text-xs font-normal">Ha</span></dd></div>
-        <div class="bg-white px-3 py-2"><dt class="text-[11px] text-basalt-soft">Sub-D.I. melapor (3 hari)</dt><dd class="font-gauge text-xl font-semibold leading-tight"><span x-text="diPilih.sub_lapor"></span><span class="text-sm font-normal text-basalt-soft" x-text="' / ' + diPilih.jumlah_sub"></span></dd></div>
-        <div class="bg-white px-3 py-2"><dt class="text-[11px] text-basalt-soft">Tanaman kekeringan</dt><dd class="font-gauge text-xl font-semibold leading-tight" :class="diPilih.luas_kering_ha > 0 && 'text-status-siaga'"><span x-text="fmt(diPilih.luas_kering_ha, 1)"></span> <span class="text-xs font-normal">Ha</span></dd></div>
-        <div class="bg-white px-3 py-2"><dt class="text-[11px] text-basalt-soft">Puso</dt><dd class="font-gauge text-xl font-semibold leading-tight" :class="diPilih.luas_puso_ha > 0 && 'text-status-kritis'"><span x-text="fmt(diPilih.luas_puso_ha, 1)"></span> <span class="text-xs font-normal">Ha</span></dd></div>
+        <div class="bg-white px-3 py-2" x-show="!modeRekap"><dt class="text-[11px] text-basalt-soft">Sub-D.I. melapor (3 hari)</dt><dd class="font-gauge text-xl font-semibold leading-tight"><span x-text="diPilih.sub_lapor"></span><span class="text-sm font-normal text-basalt-soft" x-text="' / ' + diPilih.jumlah_sub"></span></dd></div>
+        <div class="bg-white px-3 py-2" x-show="modeRekap"><dt class="text-[11px] text-basalt-soft">Hari kritis / siaga · lapor</dt><dd class="font-gauge text-xl font-semibold leading-tight"><span x-text="diPilih.hari?.kritis ?? 0"></span><span class="text-sm font-normal text-basalt-soft" x-text="` / ${diPilih.hari?.siaga ?? 0} · ${diPilih.kepatuhan ?? 0}%`"></span></dd></div>
+        <div class="bg-white px-3 py-2"><dt class="text-[11px] text-basalt-soft" x-text="modeRekap ? 'Tanaman kekeringan (puncak)' : 'Tanaman kekeringan'">Tanaman kekeringan</dt><dd class="font-gauge text-xl font-semibold leading-tight" :class="diPilih.luas_kering_ha > 0 && 'text-status-siaga'"><span x-text="fmt(diPilih.luas_kering_ha, 1)"></span> <span class="text-xs font-normal">Ha</span></dd></div>
+        <div class="bg-white px-3 py-2"><dt class="text-[11px] text-basalt-soft" x-text="modeRekap ? 'Puso (puncak)' : 'Puso'">Puso</dt><dd class="font-gauge text-xl font-semibold leading-tight" :class="diPilih.luas_puso_ha > 0 && 'text-status-kritis'"><span x-text="fmt(diPilih.luas_puso_ha, 1)"></span> <span class="text-xs font-normal">Ha</span></dd></div>
     </dl>
 </div>
 </template>
@@ -31,8 +32,8 @@
     {{-- riwayat 30 hari: satu kotak per hari, warna = status terberat hari itu --}}
     <section class="border-b border-savana-line px-4 py-3" aria-labelledby="judul-riwayat">
         <div class="flex items-baseline justify-between">
-            <h3 id="judul-riwayat" class="text-sm font-semibold">Riwayat 30 hari</h3>
-            <span class="text-[11px] text-basalt-mute">ketuk hari bertanda foto</span>
+            <h3 id="judul-riwayat" class="text-sm font-semibold" x-text="detail.riwayat_judul || 'Riwayat 30 hari'">Riwayat 30 hari</h3>
+            <span class="text-[11px] text-basalt-mute">ketuk kotak bertanda foto</span>
         </div>
         <div class="mt-2 flex gap-[2px]" role="list">
             <template x-for="h in detail.riwayat" :key="h.tanggal">

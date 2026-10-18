@@ -13,6 +13,8 @@
     @endif
 </x-judul>
 
+<x-pilih-periode :periode="$periode" rute="dashboard" class="mb-5"/>
+
 {{-- papan duga --}}
 <section class="panel p-5" aria-labelledby="judul-status">
     <div class="flex flex-wrap items-baseline justify-between gap-2">

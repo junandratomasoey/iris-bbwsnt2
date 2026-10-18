@@ -8,6 +8,8 @@ use App\Models\LaporanHarian;
 use App\Models\SubDaerahIrigasi;
 use App\Models\WilayahSatgas;
 use App\Services\KondisiService;
+use App\Services\RekapService;
+use App\Support\Periode;
 use App\Support\Role;
 use App\Support\StatusKondisi;
 use Illuminate\Http\Request;
@@ -31,6 +33,19 @@ class DashboardController extends Controller
         }
 
         $subIds = $user->subIdsTerjangkau();
+        $periode = Periode::dariRequest($request);
+        $menunggu = LaporanHarian::where('status_verifikasi', 'menunggu')
+            ->when($subIds !== null, fn ($q) => $q->whereIn('sub_daerah_irigasi_id', $subIds))->count();
+
+        if ($periode->rekap()) {
+            $mode = $request->input('warna') === 'tersering' ? 'tersering' : 'terberat';
+
+            return view('dashboard.rekap', [
+                'periode' => $periode, 'mode' => $mode, 'menunggu' => $menunggu,
+                'r' => app(RekapService::class)->rekap($periode, $subIds),
+            ]);
+        }
+
         $ringkasan = $kondisi->ringkasanDi($hari, $subIds);
         $laporan = $kondisi->laporanTerkini($hari, $subIds);
 
@@ -61,14 +76,11 @@ class DashboardController extends Controller
             ->push($hitungKepatuhan(null))
             ->filter(fn ($w) => $w['total'] > 0)->values();
 
-        $menunggu = LaporanHarian::where('status_verifikasi', 'menunggu')
-            ->when($subIds !== null, fn ($q) => $q->whereIn('sub_daerah_irigasi_id', $subIds))->count();
-
         $kejadian = Kejadian::selectRaw('status_penanganan, count(*) as jumlah, sum(luas_terdampak_ha) as luas, sum(luas_tertangani_ha) as tertangani')
             ->groupBy('status_penanganan')->get()->keyBy('status_penanganan');
 
         return view('dashboard.index', compact(
-            'ringkasan', 'perStatus', 'luasPerStatus', 'totalSub', 'laporHariIni', 'kritis', 'kepatuhan', 'menunggu', 'kejadian', 'hari'
+            'ringkasan', 'perStatus', 'luasPerStatus', 'totalSub', 'laporHariIni', 'kritis', 'kepatuhan', 'menunggu', 'kejadian', 'hari', 'periode'
         ));
     }
 }

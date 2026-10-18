@@ -14,6 +14,7 @@ use App\Http\Controllers\Master\SubDaerahIrigasiController;
 use App\Http\Controllers\PenggunaController;
 use App\Http\Controllers\PetaController;
 use App\Http\Controllers\PetugasController;
+use App\Http\Controllers\RekapController;
 use Illuminate\Support\Facades\Route;
 
 // ---------- Publik (tanpa login) ----------
@@ -33,6 +34,7 @@ Route::middleware(['auth', 'siap'])->group(function () {
     Route::put('/akun/password', [AuthController::class, 'updatePassword'])->name('password.update');
 
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
+    Route::get('/rekap/unduh', [RekapController::class, 'unduh'])->name('rekap.unduh');
 
     Route::get('/peta', [PetaController::class, 'internal'])->name('peta');
     Route::get('/api/peta', [PetaController::class, 'dataInternal'])->name('api.peta');

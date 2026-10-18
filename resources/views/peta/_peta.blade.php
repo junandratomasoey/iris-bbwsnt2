@@ -12,7 +12,8 @@
             <div class="flex items-start justify-between gap-2">
                 <div>
                     <h2 class="text-xl font-semibold leading-tight">Kondisi Daerah Irigasi</h2>
-                    <p class="text-xs text-basalt-soft">Dari laporan petugas 3 hari terakhir s.d. tanggal terpilih. Klik D.I. di peta atau daftar untuk foto, infrastruktur, dan riwayatnya.</p>
+                    <p class="text-xs text-basalt-soft" x-show="!modeRekap">Dari laporan petugas 3 hari terakhir. Klik D.I. di peta atau daftar untuk foto, infrastruktur, dan riwayatnya.</p>
+                    <p class="text-xs text-basalt-soft" x-show="modeRekap" x-cloak>Rekap <b x-text="data?.periode?.label"></b> (<span x-text="data?.periode?.keterangan"></span>). Warna = status <span x-text="warna"></span>. Klik D.I. untuk riwayat & foto.</p>
                 </div>
                 <button type="button" class="rounded p-1 hover:bg-savana lg:hidden" @click="panel = false" aria-label="Tutup panel"><x-ikon n="tutup"/></button>
             </div>
@@ -33,7 +34,7 @@
                     </template>
                 </dl>
                 <p class="mt-2 text-xs text-basalt-soft">
-                    <span x-text="fmt(rekap.kering, 1)"></span> Ha tanaman kekeringan, <span x-text="fmt(rekap.puso, 1)"></span> Ha puso
+                    <span x-text="fmt(rekap.kering, 1)"></span> Ha tanaman kekeringan, <span x-text="fmt(rekap.puso, 1)"></span> Ha puso<span x-show="modeRekap"> (puncak)</span>
                     dari <span x-text="diTampil.length"></span> D.I. (<span x-text="fmt(rekap.luas)"></span> Ha).
                 </p>
             </div>
@@ -41,8 +42,23 @@
 
         <div class="space-y-3 border-b border-savana-line p-4 text-sm">
             <div class="grid grid-cols-2 gap-2">
-                <label class="col-span-2"><span class="label">Tanggal</span>
-                    <input type="date" x-model="tanggal" max="{{ now()->toDateString() }}" class="input"></label>
+                <label class="col-span-2"><span class="label">Periode</span>
+                    <select x-model="periode" class="input">
+                        @foreach(\App\Support\Periode::PILIHAN as $k => $l)<option value="{{ $k }}">{{ $l }}</option>@endforeach
+                    </select></label>
+                <template x-if="periode === 'rentang'">
+                    <div class="col-span-2 grid grid-cols-2 gap-2">
+                        <label><span class="label">Dari</span><input type="date" x-model="dari" max="{{ now()->toDateString() }}" class="input"></label>
+                        <label><span class="label">Sampai</span><input type="date" x-model="sampai" max="{{ now()->toDateString() }}" class="input"></label>
+                    </div>
+                </template>
+                <div x-show="modeRekap" x-cloak class="col-span-2">
+                    <span class="label">Warna D.I. dalam periode</span>
+                    <div class="grid grid-cols-2 rounded-md border border-savana-line p-0.5 text-xs" role="group">
+                        <button type="button" @click="warna = 'terberat'" :class="warna === 'terberat' ? 'bg-basalt text-white' : 'text-basalt-soft'" class="rounded px-2 py-1 font-medium" title="Satu hari kritis sudah membuat D.I. merah">Terberat</button>
+                        <button type="button" @click="warna = 'tersering'" :class="warna === 'tersering' ? 'bg-basalt text-white' : 'text-basalt-soft'" class="rounded px-2 py-1 font-medium" title="Status yang paling banyak harinya">Tersering</button>
+                    </div>
+                </div>
                 <label><span class="label">Kabupaten</span>
                     <select x-model="kabupaten" class="input"><option value="">Semua</option>
                         @foreach($kabupatenList as $k)<option>{{ $k }}</option>@endforeach
@@ -99,7 +115,7 @@
                         <span class="h-8 w-1.5 shrink-0 rounded-full" :style="`background:${d.warna}`"></span>
                         <span class="min-w-0 flex-1">
                             <span class="block truncate text-sm font-semibold" x-text="'D.I. ' + d.nama"></span>
-                            <span class="block truncate text-xs text-basalt-soft" x-text="`${d.kabupaten ?? '-'} · ${d.sub_lapor}/${d.jumlah_sub} Sub-D.I. melapor`"></span>
+                            <span class="block truncate text-xs text-basalt-soft" x-text="`${d.kabupaten ?? '-'} · ` + (d.keterangan ?? `${d.sub_lapor}/${d.jumlah_sub} Sub-D.I. melapor`)"></span>
                         </span>
                         <span class="text-right text-xs">
                             <span class="block font-semibold" x-text="d.status_label"></span>

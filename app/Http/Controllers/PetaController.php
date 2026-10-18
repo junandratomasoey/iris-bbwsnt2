@@ -9,14 +9,15 @@ use App\Models\Kejadian;
 use App\Models\SubDaerahIrigasi;
 use App\Models\WilayahSatgas;
 use App\Services\DetailDiService;
+use App\Services\RekapService;
+use App\Support\Periode;
 use App\Services\KondisiService;
 use App\Support\StatusKondisi;
-use Carbon\Carbon;
 use Illuminate\Http\Request;
 
 class PetaController extends Controller
 {
-    public function __construct(private KondisiService $kondisi, private DetailDiService $detail) {}
+    public function __construct(private KondisiService $kondisi, private DetailDiService $detail, private RekapService $rekap) {}
 
     public function publik()
     {
@@ -31,9 +32,10 @@ class PetaController extends Controller
     /** Data peta untuk publik & Dinas Pertanian: tanpa nomor HP, foto internal, dan nama pelapor. */
     public function dataPublik(Request $request)
     {
-        $tgl = $this->tanggal($request);
-        $di = $this->kondisi->ringkasanDi($tgl)->values()
-            ->map(fn ($d) => collect($d)->except(['sub_per_status', 'debit_total_lps'])->all());
+        $periode = Periode::dariRequest($request);
+        $tgl = $periode->sampai;
+        $di = $this->daftarDi($request, $periode, null)
+            ->map(fn ($d) => collect($d)->except(['sub_per_status', 'debit_total_lps', 'debit_rata_lps', 'debit_min_lps'])->all());
 
         $kejadian = Kejadian::with('kabupaten:id,nama', 'daerahIrigasi:id,nama', 'foto')->whereNotNull('lat')->get()->map(fn ($k) => [
             'id' => $k->id, 'di' => $k->daerahIrigasi?->nama,
@@ -46,6 +48,7 @@ class PetaController extends Controller
 
         return response()->json([
             'tanggal' => $tgl->toDateString(),
+            'periode' => $this->infoPeriode($request, $periode),
             'daerah_irigasi' => $di,
             'kejadian' => $kejadian,
             'legenda' => $this->legenda(),
@@ -55,9 +58,11 @@ class PetaController extends Controller
     public function dataInternal(Request $request)
     {
         $user = $request->user();
-        $tgl = $this->tanggal($request);
+        $periode = Periode::dariRequest($request);
+        $tgl = $periode->sampai;
         $subIds = $user->subIdsTerjangkau();
         $ringkasan = $this->kondisi->ringkasanDi($tgl, $subIds);
+        $daftarDi = $this->daftarDi($request, $periode, $subIds, $ringkasan);
         $laporan = $this->kondisi->laporanTerkini($tgl, $subIds)->load('foto', 'user:id,name');
 
         $subs = SubDaerahIrigasi::with(['daerahIrigasi:id,nama,lat,lng', 'petugas:id,name,no_hp,jabatan'])
@@ -102,7 +107,8 @@ class PetaController extends Controller
 
         return response()->json([
             'tanggal' => $tgl->toDateString(),
-            'daerah_irigasi' => $ringkasan->values(),
+            'periode' => $this->infoPeriode($request, $periode),
+            'daerah_irigasi' => $daftarDi,
             'sub' => $subs,
             'kejadian' => $kejadian,
             'bangunan' => $bangunan,
@@ -134,7 +140,7 @@ class PetaController extends Controller
             $ids = $subIds ?? $di->subDaerahIrigasi()->pluck('id')->all();
             $data = $this->detail->fotoHarian($ids, $sampai->startOfDay(), $internal);
         } else {
-            $data = $this->detail->data($di, $this->tanggal($request), $internal, $subIds);
+            $data = $this->detail->data($di, Periode::dariRequest($request), $internal, $subIds);
         }
 
         return response()->json($data)->header('Cache-Control', 'no-cache, private');
@@ -149,11 +155,42 @@ class PetaController extends Controller
             ->map(fn ($f) => ['kecil' => $f->url_kecil, 'besar' => $f->url, 'label' => $f->label])->values()->all();
     }
 
-    private function tanggal(Request $request): Carbon
+    /**
+     * Daftar D.I. untuk peta. "Hari ini": kondisi terkini. Periode lain: rekap, dengan warna
+     * status terberat (default) atau tersering (?warna=tersering).
+     */
+    private function daftarDi(Request $request, Periode $p, ?array $subIds, $ringkasan = null)
     {
-        $t = $request->date('tanggal') ?? today();
+        if (! $p->rekap()) {
+            return ($ringkasan ?? $this->kondisi->ringkasanDi($p->sampai, $subIds))->values();
+        }
+        $mode = $request->input('warna') === 'tersering' ? 'tersering' : 'terberat';
 
-        return $t->isAfter(today()) ? today() : $t->startOfDay();
+        return collect($this->rekap->rekap($p, $subIds)['di'])->values()->map(function ($d) use ($mode) {
+            $st = RekapService::statusMode($d, $mode);
+
+            return [
+                'id' => $d['id'], 'kode' => $d['kode'], 'nama' => $d['nama'], 'kabupaten' => $d['kabupaten'], 'satgas' => $d['satgas'],
+                'luas_ha' => $d['luas_ha'], 'lat' => $d['lat'], 'lng' => $d['lng'],
+                'status' => $st, 'status_label' => StatusKondisi::label($st), 'warna' => StatusKondisi::WARNA[$st],
+                'terberat' => $d['terberat'], 'tersering' => $d['tersering'],
+                'hari' => $d['hari'], 'hari_berisiko' => $d['hari_berisiko'],
+                'jumlah_sub' => $d['jumlah_sub'], 'laporan' => $d['laporan'], 'kepatuhan' => $d['kepatuhan'],
+                'luas_tanam_ha' => $d['puncak_tanam_ha'], 'luas_kering_ha' => $d['puncak_kering_ha'],
+                'luas_puso_ha' => $d['puncak_puso_ha'], 'luas_panen_ha' => $d['puncak_panen_ha'],
+                'debit_rata_lps' => $d['debit_rata_lps'], 'debit_min_lps' => $d['debit_min_lps'],
+                'keterangan' => "{$d['hari']['kritis']} hari kritis · {$d['hari']['siaga']} siaga · lapor {$d['kepatuhan']}%",
+            ];
+        });
+    }
+
+    private function infoPeriode(Request $request, Periode $p): array
+    {
+        return [
+            'kode' => $p->kode, 'label' => $p->label, 'keterangan' => $p->keterangan(), 'rekap' => $p->rekap(),
+            'dari' => $p->dari->toDateString(), 'sampai' => $p->sampai->toDateString(), 'jumlah_hari' => $p->jumlahHari(),
+            'warna' => $request->input('warna') === 'tersering' ? 'tersering' : 'terberat',
+        ];
     }
 
     private function legenda(): array

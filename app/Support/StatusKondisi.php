@@ -47,17 +47,22 @@ final class StatusKondisi
             return self::KOSONG;
         }
 
-        $status = match ($l->kondisi_saluran) {
+        return self::dariNilai($l->kondisi_saluran, (float) $l->luas_tanam_ha, (float) $l->luas_kering_ha, (float) $l->luas_puso_ha);
+    }
+
+    /** Aturan yang sama dengan dariLaporan(), untuk baris hasil query mentah (rekap periode). */
+    public static function dariNilai(?string $kondisi, float $tanam, float $kering, float $puso): string
+    {
+        $status = match ($kondisi) {
             'penuh', 'normal' => self::AMAN,
             'kurang' => self::WASPADA,
             'kering' => self::SIAGA,
             default => self::KOSONG,
         };
 
-        $tanam = (float) $l->luas_tanam_ha;
-        $rasioKering = $tanam > 0 ? (float) $l->luas_kering_ha / $tanam : 0;
+        $rasioKering = $tanam > 0 ? $kering / $tanam : 0;
 
-        if ((float) $l->luas_puso_ha > 0 || $rasioKering >= 0.5) {
+        if ($puso > 0 || $rasioKering >= 0.5) {
             return self::KRITIS;
         }
         if ($rasioKering >= 0.25) {

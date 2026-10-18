@@ -112,7 +112,11 @@ const ikonBangunan = L.divIcon({
  * Halaman peta (Alpine component).
  * @param {{internal:boolean, api:string}} opsi
  */
+/** Tanggal lokal (bukan UTC) dalam format YYYY-MM-DD. */
+const hariIniLokal = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10); };
+
 export function createMap(opsi) {
+    const awal = new URLSearchParams(window.location.search);
     // Objek Leaflet disimpan di luar state Alpine agar tidak dibungkus Proxy reaktif.
     let map = null;
     const geo = {};
@@ -125,7 +129,18 @@ export function createMap(opsi) {
 
     return {
         internal: !!opsi.internal,
-        tanggal: new Date().toISOString().slice(0, 10),
+        periode: awal.get('periode') || 'hari_ini',
+        dari: awal.get('dari') || '',
+        sampai: awal.get('sampai') || hariIniLokal(),
+        warna: awal.get('warna') === 'tersering' ? 'tersering' : 'terberat',
+        get modeRekap() { return this.periode !== 'hari_ini'; },
+        /** parameter periode untuk API & URL halaman */
+        get qs() {
+            const q = new URLSearchParams({ periode: this.periode });
+            if (this.periode === 'rentang') { q.set('dari', this.dari); q.set('sampai', this.sampai); }
+            if (this.modeRekap && this.warna === 'tersering') q.set('warna', 'tersering');
+            return q.toString();
+        },
         kabupaten: '',
         satgas: '',
         status: { aman: true, waspada: true, siaga: true, kritis: true, kosong: true },
@@ -201,7 +216,15 @@ export function createMap(opsi) {
                 } catch (e) { geo[n] = null; }
             }));
             await this.muat();
-            this.$watch('tanggal', async () => { await this.muat(); if (this.detailId) this.bukaDetail(this.detailId, { terbang: false }); });
+            const muatUlang = async () => {
+                if (this.periode === 'rentang' && (!this.dari || !this.sampai)) return;
+                // simpan periode di URL agar tautan bisa dibagikan / dimuat ulang
+                try { history.replaceState(null, '', `${location.pathname}${this.periode === 'hari_ini' ? '' : '?' + this.qs}`); } catch (e) {}
+                await this.muat();
+                if (this.detailId) this.bukaDetail(this.detailId, { terbang: false });
+            };
+            ['periode', 'dari', 'sampai', 'warna'].forEach((k) => this.$watch(k, muatUlang));
+            if (this.periode === 'rentang' && !this.dari) this.dari = this.sampai;
             ['kabupaten', 'satgas', 'status', 'lapis', 'statusKejadian'].forEach((k) => this.$watch(k, () => this.gambar(), { deep: true }));
             let jeda = null;
             this.$watch('cari', () => { clearTimeout(jeda); jeda = setTimeout(() => this.gambarKejadian(), 250); });
@@ -212,7 +235,7 @@ export function createMap(opsi) {
             this.galat = null;
             try {
                 // cache: 'no-store' + penanda waktu agar foto/laporan baru langsung tampil (tidak terhalang cache browser/hosting)
-                const r = await fetch(`${opsi.api}?tanggal=${this.tanggal}&_=${Date.now()}`, { headers: { Accept: 'application/json' }, cache: 'no-store' });
+                const r = await fetch(`${opsi.api}?${this.qs}&_=${Date.now()}`, { headers: { Accept: 'application/json' }, cache: 'no-store' });
                 if (!r.ok) throw new Error(r.status);
                 this.data = await r.json();
                 this.gambar();
@@ -352,7 +375,7 @@ export function createMap(opsi) {
             map.closePopup();
             this.gambarSorot(terbang);
             try {
-                const r = await fetch(`${opsi.apiDetail.replace('__ID__', id)}?tanggal=${this.tanggal}&_=${Date.now()}`, { headers: { Accept: 'application/json' }, cache: 'no-store' });
+                const r = await fetch(`${opsi.apiDetail.replace('__ID__', id)}?${this.qs}&_=${Date.now()}`, { headers: { Accept: 'application/json' }, cache: 'no-store' });
                 if (!r.ok) throw new Error(r.status);
                 const data = await r.json();
                 if (this.detailId !== id) return; // pengguna sudah membuka D.I. lain
@@ -384,10 +407,23 @@ export function createMap(opsi) {
         },
 
         /** Klik kotak riwayat: buka tab foto & gulir ke tanggal itu. */
-        keTanggal(h) {
+        async keTanggal(h) {
             if (!h.foto) return;
             this.detailTab = 'foto';
-            this.$nextTick(() => document.getElementById(`foto-${h.tanggal}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+            await this.$nextTick();
+            let el = document.getElementById(`foto-${h.tanggal}`);
+            if (!el) {
+                // tanggal di luar 30 hari terakhir: muat jendela foto yang berakhir di tanggal itu
+                try {
+                    const r = await fetch(`${opsi.apiDetail.replace('__ID__', this.detailId)}?sebelum=${h.tanggal}&_=${Date.now()}`, { headers: { Accept: 'application/json' }, cache: 'no-store' });
+                    const data = await r.json();
+                    this.detail.foto_harian = data.foto_harian.map(siapkanGaleri);
+                    this.detail.foto_sebelum = data.foto_sebelum;
+                    await this.$nextTick();
+                    el = document.getElementById(`foto-${h.tanggal}`);
+                } catch (e) { /* abaikan */ }
+            }
+            el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
         },
 
         /** Garis tebal di batas D.I. terpilih, lalu peta diarahkan ke sana. */

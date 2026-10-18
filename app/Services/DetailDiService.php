@@ -7,6 +7,7 @@ use App\Models\DaerahIrigasi;
 use App\Models\Kejadian;
 use App\Models\LaporanHarian;
 use App\Models\P3a;
+use App\Support\Periode;
 use App\Support\StatusKondisi;
 use Carbon\Carbon;
 
@@ -24,8 +25,12 @@ class DetailDiService
 
     public function __construct(private KondisiService $kondisi) {}
 
-    public function data(DaerahIrigasi $di, Carbon $tgl, bool $internal, ?array $subIds = null): array
+    public function data(DaerahIrigasi $di, Periode|Carbon $periode, bool $internal, ?array $subIds = null): array
     {
+        // Carbon = kompatibel lama: riwayat 30 hari s.d. tanggal itu
+        $p = $periode instanceof Periode ? $periode : null;
+        $tgl = $p ? $p->sampai->copy() : $periode;
+        $dariRiwayat = $p && $p->rekap() ? $p->dari->copy() : $tgl->copy()->subDays(self::HARI - 1);
         $di->load(['kabupaten.wilayahSatgas', 'jadwalTanam', 'subDaerahIrigasi' => fn ($q) => $q->when($subIds !== null, fn ($w) => $w->whereIn('id', $subIds))]);
         $subs = $di->subDaerahIrigasi;
         if ($internal) {
@@ -51,7 +56,10 @@ class DetailDiService
             'ringkasan' => $ring ? collect($ring)->only(['status', 'status_label', 'warna', 'jumlah_sub', 'sub_lapor', 'luas_tanam_ha', 'luas_kering_ha', 'luas_puso_ha', 'luas_panen_ha', 'laporan_terakhir', 'mt']) : null,
             'jadwal' => $this->jadwal($di, $tgl),
             'sub' => $subs->map(fn ($s) => $this->sub($s, $terkini->get($s->id), $internal))->sortBy(fn ($s) => [-StatusKondisi::URUTAN[$s['status']], $s['nama']])->values(),
-            'riwayat' => $this->riwayat($ids, $tgl, $internal),
+            'riwayat' => $riwayat = $this->riwayat($ids, $dariRiwayat, $tgl),
+            'riwayat_judul' => $p && $p->rekap()
+                ? 'Riwayat '.$p->label.(count($riwayat) < $p->jumlahHari() ? ' (per minggu)' : '')
+                : 'Riwayat 30 hari',
             'bangunan' => $this->bangunan($di, $internal),
             'kejadian' => $this->kejadian($di, $subIds),
             'p3a' => P3a::where('daerah_irigasi_id', $di->id)->orderBy('nama')->pluck('nama'),
@@ -110,27 +118,70 @@ class DetailDiService
             ->when(! $internal, fn ($q) => $q->where('status_verifikasi', '!=', 'perbaikan'));
     }
 
-    /** Status terberat per hari selama 30 hari, untuk strip riwayat. */
-    private function riwayat(array $subIds, Carbon $tgl, bool $internal): array
+    /**
+     * Status D.I. per hari (laporan berlaku ≤ 3 hari, sama dengan rekap & peta), dikelompokkan
+     * per minggu bila rentang > 62 hari. "tanggal" = hari terakhir berfoto dalam kelompok (untuk lompat ke foto).
+     */
+    private function riwayat(array $subIds, Carbon $dari, Carbon $sampai): array
     {
-        $dari = $tgl->copy()->subDays(self::HARI - 1);
+        $kode = array_flip(StatusKondisi::URUTAN);
         $laporan = LaporanHarian::query()->whereIn('sub_daerah_irigasi_id', $subIds)
-            ->whereBetween('tanggal', [$dari->toDateString(), $tgl->toDateString()])
+            ->whereBetween('tanggal', [$dari->copy()->subDays(StatusKondisi::MASA_BERLAKU_HARI - 1)->toDateString(), $sampai->toDateString()])
             ->where('status_verifikasi', '!=', 'perbaikan')
-            ->withCount('foto')->get()->groupBy(fn ($l) => $l->tanggal->toDateString());
+            ->withCount('foto')->orderBy('tanggal')->get();
 
-        $hasil = [];
-        for ($d = $dari->copy(); $d->lte($tgl); $d->addDay()) {
-            $hari = $laporan->get($d->toDateString(), collect());
-            $st = $hari->reduce(fn ($m, $l) => StatusKondisi::maks($m, $l->status()), StatusKondisi::KOSONG);
-            $hasil[] = [
-                'tanggal' => $d->toDateString(), 'label' => $d->translatedFormat('d M'),
-                'status' => $st, 'warna' => StatusKondisi::WARNA[$st], 'status_label' => StatusKondisi::label($st),
-                'laporan' => $hari->count(), 'foto' => (int) $hari->sum('foto_count'),
-            ];
+        $hari = [];
+        for ($d = $dari->copy(); $d->lte($sampai); $d->addDay()) {
+            $hari[$d->toDateString()] = ['status' => 0, 'laporan' => 0, 'foto' => 0];
+        }
+        foreach ($laporan as $l) {
+            $t = $l->tanggal->toDateString();
+            if (isset($hari[$t])) {
+                $hari[$t]['laporan']++;
+                $hari[$t]['foto'] += $l->foto_count;
+            }
+        }
+        foreach ($laporan->groupBy('sub_daerah_irigasi_id') as $baris) {
+            $baris = $baris->values();
+            $k = -1;
+            foreach (array_keys($hari) as $t) {
+                while ($k + 1 < $baris->count() && $baris[$k + 1]->tanggal->toDateString() <= $t) {
+                    $k++;
+                }
+                if ($k >= 0 && $baris[$k]->tanggal->diffInDays(Carbon::parse($t)) < StatusKondisi::MASA_BERLAKU_HARI) {
+                    $hari[$t]['status'] = max($hari[$t]['status'], StatusKondisi::URUTAN[$baris[$k]->status()]);
+                }
+            }
         }
 
-        return $hasil;
+        $mingguan = count($hari) > 62;
+        $kelompok = [];
+        foreach ($hari as $t => $h) {
+            $c = Carbon::parse($t);
+            if (! $mingguan || ! $kelompok || $c->isMonday()) {
+                $kelompok[] = ['awal' => $c, 'akhir' => $c, 'status' => 0, 'laporan' => 0, 'foto' => 0, 'tanggal_foto' => null];
+            }
+            $g = &$kelompok[count($kelompok) - 1];
+            $g['akhir'] = $c;
+            $g['status'] = max($g['status'], $h['status']);
+            $g['laporan'] += $h['laporan'];
+            $g['foto'] += $h['foto'];
+            if ($h['foto']) {
+                $g['tanggal_foto'] = $t;
+            }
+            unset($g);
+        }
+
+        return array_map(function ($g) use ($kode, $mingguan) {
+            $st = $kode[$g['status']];
+
+            return [
+                'tanggal' => $g['tanggal_foto'] ?? $g['akhir']->toDateString(),
+                'label' => $mingguan ? $g['awal']->translatedFormat('d M').' – '.$g['akhir']->translatedFormat('d M') : $g['awal']->translatedFormat('d M'),
+                'status' => $st, 'warna' => StatusKondisi::WARNA[$st], 'status_label' => StatusKondisi::label($st),
+                'laporan' => $g['laporan'], 'foto' => $g['foto'],
+            ];
+        }, $kelompok);
     }
 
     private function sub($s, ?LaporanHarian $l, bool $internal): array
