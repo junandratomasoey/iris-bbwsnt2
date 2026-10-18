@@ -1,66 +1,101 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# IRIS-BBWSNTII
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+**Irrigation Information System — BBWS Nusa Tenggara II**
 
-## About Laravel
+Peta interaktif dan laporan harian kondisi 26 Daerah Irigasi (D.I.) kewenangan pusat di Nusa Tenggara Timur, untuk memantau air irigasi dan memprediksi kekeringan sawah per musim tanam (MT I, II, III).
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+Stack: Laravel 11 · MySQL/MariaDB · Blade + Alpine.js · Tailwind CSS · Leaflet. Tanpa paket Composer tambahan, jadi aman untuk shared hosting.
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Fitur Tahap 1
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+| Modul | Isi |
+| --- | --- |
+| Peta publik (`/`) | Poligon D.I. fungsional/baku/potensial dari Peta IGT, warna status hari ini, titik kejadian kekeringan. Tanpa nomor HP dan data internal. |
+| Peta internal (`/peta`) | Ditambah titik Sub-D.I. dengan laporan terakhir, foto, dan tombol WhatsApp petugas. Isinya dibatasi sesuai wilayah pengguna. |
+| Laporan harian | Form untuk HP: debit intake & TMA (wajib), kondisi saluran, bukaan pintu, fase tanaman, luas tanam/hijau/kekeringan/puso/panen, maks. 5 foto (dikompres di browser lalu di server), GPS otomatis, draf tersimpan saat offline. |
+| Verifikasi | Koordinator Satgas, Manager D.I., dan Admin OP menyetujui laporan atau mengembalikannya untuk perbaikan. Laporan yang sudah disetujui terkunci. |
+| Kejadian kekeringan | 95 lokasi dari rekapan, laporan kejadian baru, status penanganan, dan luas tertangani. |
+| Dashboard | Strip status D.I., Ha berisiko, kepatuhan lapor per Satgas, luas lahan, kejadian, dan 10 Sub-D.I. paling kritis. |
+| Master data | D.I., Sub-D.I. (atur titik di peta), jadwal MT resmi Bidang OP (timeline), P3A, pengguna dan penugasan Sub-D.I. |
+| Lainnya | Direktori kontak petugas + WhatsApp, ekspor CSV, log aktivitas, PWA (bisa dipasang di layar utama HP). |
 
-## Learning Laravel
+Status tahap 1 dihitung dari laporan 3 hari terakhir (`app/Support/StatusKondisi.php`):
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+- kondisi saluran penuh/normal → **Aman**, kurang → **Waspada**, kering → **Siaga**
+- tanaman kekeringan ≥ 10% luas tanam → minimal Waspada; ≥ 25% → minimal Siaga; ≥ 50% atau ada puso → **Kritis**
+- status D.I. = status Sub-D.I. terberat
 
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
+Tahap 2 akan menggantinya dengan Indeks Risiko Kekeringan berbasis neraca air (debit vs kebutuhan per fase).
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+## Peran pengguna
 
-## Laravel Sponsors
+| Role | Akses |
+| --- | --- |
+| `super_admin` | Semua, termasuk log aktivitas |
+| `admin_op` | Semua data, kelola master & pengguna (tidak bisa membuat super admin) |
+| `pimpinan` | Lihat semua, tanpa mengubah data |
+| `koordinator` | Wilayah Satgas-nya: lihat, verifikasi, tangani kejadian |
+| `manager` | D.I.-nya: lihat, lapor, verifikasi |
+| `petugas`, `pob` | Lapor untuk Sub-D.I. yang ditugaskan; tambah, ubah, hapus laporannya sendiri sebelum disetujui |
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+Login memakai username **atau nomor HP** (format 08…, +62…, atau dengan spasi/tanda hubung).
 
-### Premium Partners
+## Instalasi lokal (Laravel Herd, Windows)
 
-- **[Vehikl](https://vehikl.com/)**
-- **[Tighten Co.](https://tighten.co)**
-- **[WebReinvent](https://webreinvent.com/)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel/)**
-- **[Cyber-Duck](https://cyber-duck.co.uk)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Jump24](https://jump24.co.uk)**
-- **[Redberry](https://redberry.international/laravel/)**
-- **[Active Logic](https://activelogic.com)**
-- **[byte5](https://byte5.de)**
-- **[OP.GG](https://op.gg)**
+```powershell
+cd E:\Herd\iris-bbwsnt2
+composer dump-autoload
+# buat database kosong "iris_bbwsnt2" (utf8mb4) di MySQL, lalu sesuaikan DB_* di .env
+php artisan migrate --seed
+npm install       # hanya bila ingin mengubah tampilan; hasil build sudah ada di public/build
+```
 
-## Contributing
+`--seed` mengisi data awal dari file Excel dan Peta IGT (`database/seeders/data/master.json`, `public/geojson/*.geojson`):
+5 Satgas, 26 D.I., 179 Sub-D.I., 173 bangunan utama, 50 P3A, 95 kejadian, dan sekitar 620 akun (1 admin + petugas dari "Daftar Kontak Petugas Irigasi").
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+Setiap akun mendapat **password acak** yang ditulis ke `storage/app/akun-awal-YYYYMMDD-HHMMSS.csv`. Bagikan ke petugas (mis. lewat WhatsApp), lalu **hapus file itu**. Semua akun wajib mengganti password saat login pertama. Isi `IRIS_ADMIN_PASSWORD` di `.env` sebelum seeding bila ingin menentukan password admin sendiri.
 
-## Code of Conduct
+Data contoh untuk demo (jangan di produksi):
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+```powershell
+php artisan db:seed --class=DemoLaporanSeeder
+# hapus lagi:
+php artisan tinker --execute="App\Models\LaporanHarian::where('kendala','like','[DEMO]%')->delete(); App\Models\JadwalTanam::where('sumber','[DEMO]')->delete();"
+```
 
-## Security Vulnerabilities
+## Deploy ke shared hosting (cPanel)
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+1. **Versi PHP.** `composer.lock` saat ini dibuat dengan PHP 8.4 (paket Symfony 8). Bila hosting masih PHP 8.2/8.3, jalankan di laptop lalu commit:
+   ```powershell
+   composer config platform.php 8.2.0
+   composer update
+   ```
+2. **MySQL/MariaDB.** Collation default sudah `utf8mb4_unicode_ci` sehingga cocok untuk MySQL 5.7/8 dan MariaDB.
+3. **Upload.** Lakukan `git pull` ke folder di luar `public_html` (mis. `~/iris`), lalu `composer install --no-dev --optimize-autoloader`. Arahkan domain/subdomain ke `~/iris/public`, atau symlink `public_html` → `~/iris/public`.
+4. **.env produksi.** Atur `APP_ENV=production`, `APP_DEBUG=false`, `APP_URL=https://…`, `APP_TIMEZONE=Asia/Makassar`, dan `DB_*`. Lalu jalankan:
+   ```bash
+   php artisan key:generate   # hanya sekali, bila APP_KEY kosong
+   php artisan migrate --force --seed
+   php artisan config:cache && php artisan route:cache && php artisan view:cache
+   ```
+5. **Foto lapangan** disimpan di `public/uploads/` (tidak perlu `storage:link`). Pastikan folder bisa ditulis web server. Folder ini ada di `.gitignore`; backup terpisah.
+6. **Aset tampilan** (`public/build/`) ikut di-commit, jadi server tidak butuh Node.js. Setelah mengubah tampilan, jalankan `npm run build` di laptop lalu commit.
+7. **HTTPS wajib** agar GPS di HP dan PWA (service worker) berfungsi.
 
-## License
+## Data sumber
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+- `Kompilasi_Template_Kekeringan_Sawah_BBWS_NT_II.xlsx` → `database/seeders/data/master.json`
+- `D:\OP\BBWS NT2 _ Peta IGT` (BAKU_NTT, Fungsional_BWS_NTII, Potensial_BWS_NTII) → `public/geojson/{baku,fungsional,potensial}.geojson`
+  - diproyeksikan ulang dari World Cylindrical Equal Area ke WGS84, digabung per D.I., disederhanakan ±15 m
+  - luas dihitung dari geometri (kolom `L_Baku` di layer Fungsional terulang per potongan poligon, jadi tidak dipakai)
+  - D.I. Pota, Tanah Raing (fungsional), dan Netemnanu (baku/potensial) belum terhubung ke 26 D.I. Permen
+
+Kabupaten yang Satgas-nya belum pasti dari data (Timor Tengah Selatan, Ngada, Nagekeo) dibiarkan kosong. Atur lewat database atau tambahkan ke `WilayahSatgasSeeder`.
+
+## Tes
+
+```powershell
+php artisan test
+```
+
+Tes memakai SQLite in-memory dan mencakup alur lapor, verifikasi, batas akses per wilayah, privasi peta publik, jadwal tanam, kejadian, dan pengguna.

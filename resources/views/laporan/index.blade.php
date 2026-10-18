@@ -1,0 +1,68 @@
+<x-layouts.app title="Laporan harian">
+<x-judul judul="Laporan harian" sub="Laporan kondisi air dan lahan dari petugas lapangan.">
+    <a href="{{ route('laporan.ekspor', request()->query()) }}" class="btn-ghost"><x-ikon n="unduh" class="h-4 w-4"/> Unduh CSV</a>
+    @can('create', App\Models\LaporanHarian::class)
+        <a href="{{ route('laporan.create') }}" class="btn-primary"><x-ikon n="tambah" class="h-4 w-4"/> Isi laporan</a>
+    @endcan
+</x-judul>
+
+<form method="GET" class="panel mb-4 grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-6">
+    <label class="lg:col-span-2"><span class="label">D.I.</span>
+        <select name="di" class="input"><option value="">Semua D.I.</option>
+            @foreach($diList as $d)<option value="{{ $d->id }}" @selected(request('di') == $d->id)>{{ $d->nama }}</option>@endforeach
+        </select></label>
+    <label><span class="label">Dari</span><input type="date" name="dari" value="{{ request('dari') }}" class="input"></label>
+    <label><span class="label">Sampai</span><input type="date" name="sampai" value="{{ request('sampai') }}" class="input"></label>
+    <label><span class="label">Verifikasi</span>
+        <select name="verifikasi" class="input"><option value="">Semua</option>
+            @foreach(App\Models\LaporanHarian::VERIFIKASI as $k => $l)<option value="{{ $k }}" @selected(request('verifikasi') === $k)>{{ $l }}</option>@endforeach
+        </select></label>
+    <div class="flex items-end gap-2">
+        <button class="btn-primary flex-1">Terapkan</button>
+        @if(request()->query())<a href="{{ route('laporan.index') }}" class="btn-ghost">Reset</a>@endif
+    </div>
+    <label class="flex items-center gap-2 text-sm sm:col-span-2 lg:col-span-6"><input type="checkbox" name="milik_saya" value="1" @checked(request('milik_saya')) class="rounded border-savana-line text-saluran-600"> Hanya laporan saya</label>
+</form>
+
+<div class="panel overflow-hidden">
+    @if($laporan->isEmpty())
+        <x-kosong judul="Belum ada laporan" :aksi="auth()->user()->can('create', App\Models\LaporanHarian::class) ? 'Isi laporan pertama' : null" :url="route('laporan.create')">Laporan harian dari petugas akan muncul di sini.</x-kosong>
+    @else
+        {{-- tabel untuk layar lebar --}}
+        <div class="hidden overflow-x-auto md:block">
+            <table class="table-base">
+                <thead><tr><th>Tanggal</th><th>Sub-D.I.</th><th class="text-right">Debit (L/dt)</th><th class="text-right">TMA (cm)</th><th>Saluran</th><th class="text-right">Tanam / kering / puso (Ha)</th><th>Status</th><th>Pelapor</th><th>Verifikasi</th></tr></thead>
+                <tbody>
+                @foreach($laporan as $l)
+                    <tr class="hover:bg-savana">
+                        <td class="whitespace-nowrap"><a href="{{ route('laporan.show', $l) }}" class="font-semibold text-saluran-700 hover:underline">{{ $l->tanggal->translatedFormat('d M Y') }}</a></td>
+                        <td>{{ $l->subDaerahIrigasi->nama }}<div class="text-xs text-basalt-soft">D.I. {{ $l->subDaerahIrigasi->daerahIrigasi->nama }}</div></td>
+                        <td class="text-right tabular-nums">{{ angka($l->debit_intake_lps, 1) }}</td>
+                        <td class="text-right tabular-nums">{{ angka($l->tma_cm, 1) }}</td>
+                        <td>{{ App\Models\LaporanHarian::KONDISI[$l->kondisi_saluran] ?? $l->kondisi_saluran }}</td>
+                        <td class="whitespace-nowrap text-right tabular-nums">{{ angka($l->luas_tanam_ha, 1) }} / {{ angka($l->luas_kering_ha, 1) }} / {{ angka($l->luas_puso_ha, 1) }}</td>
+                        <td><x-status :s="$l->status()"/></td>
+                        <td class="text-xs">{{ $l->user->name }}@if($l->foto_count)<div class="text-basalt-mute">{{ $l->foto_count }} foto</div>@endif</td>
+                        <td><x-verifikasi :s="$l->status_verifikasi"/></td>
+                    </tr>
+                @endforeach
+                </tbody>
+            </table>
+        </div>
+        {{-- kartu untuk HP --}}
+        <ul class="divide-y divide-savana-line md:hidden">
+            @foreach($laporan as $l)
+                <li><a href="{{ route('laporan.show', $l) }}" class="block px-4 py-3">
+                    <div class="flex items-start justify-between gap-2">
+                        <div><p class="font-semibold">{{ $l->subDaerahIrigasi->nama }}</p><p class="text-xs text-basalt-soft">{{ $l->tanggal->translatedFormat('d M Y') }} · {{ $l->user->name }}</p></div>
+                        <x-status :s="$l->status()"/>
+                    </div>
+                    <p class="mt-1 text-xs text-basalt-soft">Debit {{ angka($l->debit_intake_lps, 1) }} L/dt · TMA {{ angka($l->tma_cm, 1) }} cm · kering {{ angka($l->luas_kering_ha, 1) }} Ha</p>
+                    <div class="mt-1"><x-verifikasi :s="$l->status_verifikasi"/></div>
+                </a></li>
+            @endforeach
+        </ul>
+        {{ $laporan->links() }}
+    @endif
+</div>
+</x-layouts.app>
