@@ -16,6 +16,8 @@ Stack: Laravel 11 · MySQL/MariaDB · Blade + Alpine.js · Tailwind CSS · Leafl
 | Verifikasi | Koordinator Satgas, Manager D.I., dan Admin OP menyetujui laporan atau mengembalikannya untuk perbaikan. Laporan yang sudah disetujui terkunci. |
 | Kejadian kekeringan | 95 lokasi dari rekapan, laporan kejadian baru, status penanganan, dan luas tertangani. |
 | Dashboard | Strip status D.I., Ha berisiko, kepatuhan lapor per Satgas, luas lahan, kejadian, dan 10 Sub-D.I. paling kritis. |
+| Detail D.I. di peta | Klik D.I. (peta atau daftar) membuka panel: status & angka kunci, riwayat status 30 hari, jadwal MT, foto laporan per tanggal (geser antar foto, muat 30 hari sebelumnya), kondisi tiap Sub-D.I., infrastruktur beserta kondisi & fotonya, kejadian, dan data teknis. Versi publik tanpa nomor HP, nama petugas, debit/TMA, dan laporan yang dikembalikan untuk perbaikan. |
+| Infrastruktur | Bendung, intake, saluran, bangunan bagi/sadap per D.I.: kondisi fisik (baik / rusak ringan / sedang / berat) dan tanggal pemeriksaan, titik lokasi, maks. 12 foto. |
 | Master data | D.I., Sub-D.I. (atur titik di peta), jadwal MT resmi Bidang OP (timeline), P3A, pengguna dan penugasan Sub-D.I. |
 | Lainnya | Direktori kontak petugas + WhatsApp, ekspor CSV, log aktivitas, PWA (bisa dipasang di layar utama HP). |
 
@@ -87,8 +89,8 @@ php artisan tinker --execute="App\Models\LaporanHarian::where('kendala','like','
 ```bash
 git pull
 php artisan migrate --force
-php artisan optimize:clear
-php artisan config:cache && php artisan view:cache
+php artisan route:clear
+php artisan view:clear
 ```
 
 **Jangan jalankan `php artisan route:cache` atau `php artisan optimize`** bila aplikasi dipasang di subfolder (mis. `bbwsnt2.com/iris`). Route cache Laravel membuang garis miring akhir sebelum mencocokkan route, sehingga halaman utama `/iris/` membalas *405 Method Not Allowed*. Bila terlanjur, jalankan `php artisan route:clear`.

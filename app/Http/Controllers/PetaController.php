@@ -3,10 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Models\Bangunan;
+use App\Models\DaerahIrigasi;
 use App\Models\Kabupaten;
 use App\Models\Kejadian;
 use App\Models\SubDaerahIrigasi;
 use App\Models\WilayahSatgas;
+use App\Services\DetailDiService;
 use App\Services\KondisiService;
 use App\Support\StatusKondisi;
 use Carbon\Carbon;
@@ -14,7 +16,7 @@ use Illuminate\Http\Request;
 
 class PetaController extends Controller
 {
-    public function __construct(private KondisiService $kondisi) {}
+    public function __construct(private KondisiService $kondisi, private DetailDiService $detail) {}
 
     public function publik()
     {
@@ -106,6 +108,36 @@ class PetaController extends Controller
             'bangunan' => $bangunan,
             'legenda' => $this->legenda(),
         ]);
+    }
+
+    /** Panel detail D.I. (publik). ?sebelum=YYYY-MM-DD hanya mengembalikan foto 30 hari sebelum tanggal itu. */
+    public function detailPublik(Request $request, DaerahIrigasi $di)
+    {
+        return $this->detail($request, $di, false, null);
+    }
+
+    public function detailInternal(Request $request, DaerahIrigasi $di)
+    {
+        $subIds = $request->user()->subIdsTerjangkau();
+        if ($subIds !== null) {
+            $subIds = $di->subDaerahIrigasi()->whereIn('id', $subIds)->pluck('id')->all();
+            abort_if(! $subIds, 403, 'D.I. ini di luar wilayah tugas Anda.');
+        }
+
+        return $this->detail($request, $di, true, $subIds);
+    }
+
+    private function detail(Request $request, DaerahIrigasi $di, bool $internal, ?array $subIds)
+    {
+        if ($request->filled('sebelum')) {
+            $sampai = $request->date('sebelum');
+            $ids = $subIds ?? $di->subDaerahIrigasi()->pluck('id')->all();
+            $data = $this->detail->fotoHarian($ids, $sampai->startOfDay(), $internal);
+        } else {
+            $data = $this->detail->data($di, $this->tanggal($request), $internal, $subIds);
+        }
+
+        return response()->json($data)->header('Cache-Control', 'no-cache, private');
     }
 
     /** Maks. 6 foto per kejadian: urut sebelum → sesudah → lainnya. */

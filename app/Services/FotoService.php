@@ -64,7 +64,8 @@ class FotoService
         if (! function_exists('exif_read_data') || ! in_array($file->getMimeType(), ['image/jpeg', 'image/jpg'])) {
             return $img;
         }
-        $o = @exif_read_data($file->getRealPath())['Orientation'] ?? 1;
+        $exif = @exif_read_data($file->getRealPath());
+        $o = is_array($exif) ? (int) ($exif['Orientation'] ?? 1) : 1;
 
         return match ($o) {
             3 => imagerotate($img, 180, 0),

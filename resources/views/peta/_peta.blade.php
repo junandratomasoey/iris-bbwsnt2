@@ -1,13 +1,18 @@
 {{-- Peta bersama untuk halaman publik & internal. Variabel: $internal, $api --}}
-<div x-data="peta({ internal: {{ $internal ? 'true' : 'false' }}, api: '{{ $api }}' })" class="relative flex h-full min-h-0">
-    {{-- panel samping --}}
-    <aside x-show="panel" x-cloak
-           class="absolute inset-y-0 left-0 z-[500] flex w-[22rem] max-w-[90vw] flex-col overflow-y-auto border-r border-savana-line bg-white lg:static lg:z-auto">
+<div x-data="peta({ internal: {{ $internal ? 'true' : 'false' }}, api: '{{ $api }}', apiDetail: '{{ $apiDetail }}' })" class="relative flex h-full min-h-0">
+    {{-- panel samping: daftar & filter, atau detail D.I. terpilih --}}
+    <aside x-show="panel" x-cloak x-ref="panel"
+           :class="detailId ? 'w-full sm:w-[26rem]' : 'w-[22rem] max-w-[90vw]'"
+           class="absolute inset-y-0 left-0 z-[500] flex shrink-0 flex-col overflow-y-auto border-r border-savana-line bg-white lg:static lg:z-auto">
+        <div x-show="detailId" x-cloak>
+            @include('peta._detail', ['internal' => $internal])
+        </div>
+        <div x-show="!detailId" class="contents">
         <div class="border-b border-savana-line p-4">
             <div class="flex items-start justify-between gap-2">
                 <div>
                     <h2 class="text-xl font-semibold leading-tight">Kondisi Daerah Irigasi</h2>
-                    <p class="text-xs text-basalt-soft">Dari laporan petugas 3 hari terakhir s.d. tanggal terpilih.</p>
+                    <p class="text-xs text-basalt-soft">Dari laporan petugas 3 hari terakhir s.d. tanggal terpilih. Klik D.I. di peta atau daftar untuk foto, infrastruktur, dan riwayatnya.</p>
                 </div>
                 <button type="button" class="rounded p-1 hover:bg-savana lg:hidden" @click="panel = false" aria-label="Tutup panel"><x-ikon n="tutup"/></button>
             </div>
@@ -141,11 +146,12 @@
                 <li x-show="data && !kejadianTampil.length" class="p-6 text-center text-sm text-basalt-soft">Tidak ada kejadian yang cocok.</li>
             </ul>
         </div>
+        </div>
     </aside>
 
     <div class="relative min-w-0 flex-1">
         <div x-ref="peta" class="absolute inset-0 z-0" role="application" aria-label="Peta Daerah Irigasi NTT"></div>
-        <button type="button" x-show="!panel" @click="panel = true" class="absolute left-3 top-3 z-[400] btn-ghost shadow"><x-ikon n="filter" class="h-4 w-4"/> Daftar &amp; filter</button>
+        <button type="button" x-show="!panel" @click="panel = true" class="absolute left-3 top-3 z-[400] btn-ghost max-w-[60vw] shadow"><x-ikon n="filter" class="h-4 w-4 shrink-0"/> <span class="truncate" x-text="diPilih ? 'Detail D.I. ' + diPilih.nama : 'Daftar & filter'">Daftar &amp; filter</span></button>
         <div x-show="memuat" class="absolute left-1/2 top-3 z-[400] -translate-x-1/2 rounded-full bg-white px-3 py-1 text-xs font-medium shadow">Memuat data…</div>
         <div x-show="galat" x-cloak class="absolute left-1/2 top-3 z-[400] -translate-x-1/2 rounded-md bg-[#FBECEA] px-3 py-2 text-xs font-medium text-[#7E1A14] shadow" x-text="galat"></div>
         <div class="absolute right-3 top-3 z-[400] hidden rounded-md bg-white/95 px-3 py-2 text-xs shadow sm:block">

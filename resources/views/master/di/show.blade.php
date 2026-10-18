@@ -73,9 +73,12 @@
         @endforelse
     </section>
     <section class="panel p-5">
-        <h2 class="text-lg font-semibold">Bangunan ({{ $di->bangunan->count() }})</h2>
+        <div class="flex items-baseline justify-between"><h2 class="text-lg font-semibold">Infrastruktur ({{ $di->bangunan->count() }})</h2>
+            <span class="flex gap-3 text-sm font-medium">@if($kelola)<a href="{{ route('master.bangunan.create', ['di' => $di->id]) }}" class="text-saluran-600">Tambah</a>@endif<a href="{{ route('master.bangunan.index', ['di' => $di->id]) }}" class="text-saluran-600">Semua</a></span></div>
         <ul class="mt-2 divide-y divide-savana-line text-sm">
-            @foreach($di->bangunan as $b)<li class="flex justify-between py-1.5"><span>{{ $b->nama }}</span><span class="text-basalt-soft">{{ Bangunan::JENIS[$b->jenis] ?? $b->jenis }}</span></li>@endforeach
+            @foreach($di->bangunan->sortBy('nama') as $b)<li class="flex items-center justify-between gap-2 py-1.5">
+                <span>@if($kelola)<a href="{{ route('master.bangunan.edit', $b) }}" class="hover:underline">{{ $b->nama }}</a>@else{{ $b->nama }}@endif <span class="text-xs text-basalt-mute">{{ $b->jenis_label }}</span></span>
+                <span class="inline-flex shrink-0 items-center gap-1.5 text-xs"><span class="h-2 w-2 rounded-full" style="background: {{ $b->warna_kondisi }}"></span>{{ $b->kondisi_label }}</span></li>@endforeach
         </ul>
     </section>
     <section class="panel p-5">

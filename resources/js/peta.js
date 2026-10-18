@@ -24,26 +24,6 @@ function chip(label, warna) {
     return `<span style="display:inline-flex;align-items:center;gap:4px;border-radius:999px;padding:1px 8px;font-size:11px;font-weight:600;background:${warna}22;color:#1E2A2F"><span style="width:7px;height:7px;border-radius:50%;background:${warna}"></span>${esc(label)}</span>`;
 }
 
-function popupDi(d, internal) {
-    if (!d) return '';
-    return `<div style="min-width:220px">
-        <div style="font-family:'Barlow Semi Condensed';font-size:18px;font-weight:600;line-height:1.1">D.I. ${esc(d.nama)}</div>
-        <div style="font-size:12px;color:#4A585E;margin:2px 0 6px">${esc(d.kabupaten ?? '')}${d.satgas ? ' · Satgas ' + esc(d.satgas) : ''}</div>
-        ${chip(d.status_label, d.warna)}
-        <table style="margin-top:8px;font-size:12px;width:100%">
-            <tr><td style="color:#4A585E">Luas fungsional</td><td style="text-align:right">${fmt(d.luas_ha)} Ha</td></tr>
-            <tr><td style="color:#4A585E">Musim tanam</td><td style="text-align:right">${esc(d.mt ?? 'Belum dijadwalkan')}</td></tr>
-            <tr><td style="color:#4A585E">Sub-D.I. melapor</td><td style="text-align:right">${d.sub_lapor} dari ${d.jumlah_sub}</td></tr>
-            <tr><td style="color:#4A585E">Luas tanam</td><td style="text-align:right">${fmt(d.luas_tanam_ha, 1)} Ha</td></tr>
-            <tr><td style="color:#4A585E">Tanaman kekeringan</td><td style="text-align:right">${fmt(d.luas_kering_ha, 1)} Ha</td></tr>
-            <tr><td style="color:#4A585E">Puso</td><td style="text-align:right">${fmt(d.luas_puso_ha, 1)} Ha</td></tr>
-            ${internal ? `<tr><td style="color:#4A585E">Total debit intake</td><td style="text-align:right">${fmt(d.debit_total_lps, 1)} L/dt</td></tr>` : ''}
-        </table>
-        <div style="font-size:11px;color:#7C898E;margin-top:6px">Laporan terakhir: ${esc(d.laporan_terakhir ?? 'belum ada')}</div>
-        ${internal ? `<a href="${BASE}/master/daerah-irigasi/${d.id}" style="display:inline-block;margin-top:8px;font-size:12px;font-weight:600;color:#0F5E6E">Buka profil D.I.</a>` : ''}
-    </div>`;
-}
-
 function popupSub(s) {
     const l = s.laporan;
     const petugas = (s.petugas || []).slice(0, 4).map((p) => `<div style="display:flex;justify-content:space-between;gap:8px;align-items:center;margin-top:3px">
@@ -93,6 +73,29 @@ function popupKejadian(k, internal) {
     </div>`;
 }
 
+/** Gabungkan semua foto satu tanggal agar penampil foto bisa digeser antar Sub-D.I. */
+function siapkanGaleri(g) {
+    const semua = [];
+    g.laporan.forEach((l) => l.foto.forEach((f) => { f.n = semua.length; semua.push(f); }));
+    return { ...g, semua, galeri: JSON.stringify(semua.map((f) => ({ besar: f.besar, label: f.label }))) };
+}
+
+function popupBangunan(b) {
+    return `<div style="min-width:200px;max-width:240px;font-size:12px">
+        <div style="font-weight:700;font-size:13px">${esc(b.nama)}</div>
+        <div style="color:#4A585E;margin:2px 0 6px">${esc(b.jenis)}${b.sub ? ' · ' + esc(b.sub) : ''}</div>
+        ${chip(b.kondisi_label, b.warna)}${b.kondisi_per ? `<span style="color:#7C898E;margin-left:4px">per ${esc(b.kondisi_per)}</span>` : ''}
+        ${b.keterangan ? `<div style="margin-top:6px">${esc(b.keterangan)}</div>` : ''}
+        ${b.foto.length ? galeriPopup(b.foto) : ''}
+    </div>`;
+}
+
+const ikonInfra = (warna) => L.divIcon({
+    className: '',
+    html: `<svg width="18" height="18" viewBox="0 0 18 18"><rect x="2" y="2" width="14" height="14" rx="2" fill="${warna}" stroke="#fff" stroke-width="2"/><path d="M5 12h8M6 12V8l3-2 3 2v4" stroke="#fff" stroke-width="1.4" fill="none"/></svg>`,
+    iconSize: [18, 18], iconAnchor: [9, 9],
+});
+
 const ikonKejadian = (warna) => L.divIcon({
     className: '',
     html: `<svg width="18" height="18" viewBox="0 0 18 18"><path d="M9 1.5 17 16H1z" fill="${warna}" stroke="#fff" stroke-width="1.5"/></svg>`,
@@ -116,6 +119,7 @@ export function createMap(opsi) {
     let layers = {};
     let aturTitikFn = null;
     const markerKejadian = new Map(); // id → marker, untuk membuka popup dari daftar
+    const markerBangunan = new Map();
     const URUT_KEJADIAN = { 'Perlu Penanganan': 0, 'Dalam Penanganan': 1, 'Selesai Ditangani': 2, 'Tidak Perlu Penanganan': 3 };
     const normal = (t) => String(t ?? '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/^(d\.?\s*i\.?\s+)/, '');
 
@@ -133,6 +137,13 @@ export function createMap(opsi) {
         tab: 'di',
         cari: '',
         statusKejadian: '',
+        // panel detail D.I.
+        detailId: null,
+        detail: null,
+        detailMemuat: false,
+        detailGalat: null,
+        detailTab: 'foto',
+        memuatLama: false,
 
         get diTampil() {
             if (!this.data) return [];
@@ -190,7 +201,7 @@ export function createMap(opsi) {
                 } catch (e) { geo[n] = null; }
             }));
             await this.muat();
-            ['tanggal'].forEach((k) => this.$watch(k, () => this.muat()));
+            this.$watch('tanggal', async () => { await this.muat(); if (this.detailId) this.bukaDetail(this.detailId, { terbang: false }); });
             ['kabupaten', 'satgas', 'status', 'lapis', 'statusKejadian'].forEach((k) => this.$watch(k, () => this.gambar(), { deep: true }));
             let jeda = null;
             this.$watch('cari', () => { clearTimeout(jeda); jeda = setTimeout(() => this.gambarKejadian(), 250); });
@@ -236,9 +247,9 @@ export function createMap(opsi) {
                     },
                     onEachFeature: (f, layer) => {
                         const d = diByKode[f.properties.kode];
-                        layer.bindPopup(d ? popupDi(d, this.internal)
-                            : `<b>${esc(f.properties.nama)}</b><br><span style="font-size:12px">${fmt(f.properties.luas_ha)} Ha · belum terhubung ke data D.I.</span>`);
-                        layer.bindTooltip(f.properties.nama, { sticky: true, direction: 'top' });
+                        if (d) layer.on('click', () => this.bukaDetail(d.id, { terbang: false }));
+                        else layer.bindPopup(`<b>${esc(f.properties.nama)}</b><br><span style="font-size:12px">${fmt(f.properties.luas_ha)} Ha · belum terhubung ke data D.I.</span>`);
+                        layer.bindTooltip(d ? `D.I. ${f.properties.nama} · klik untuk detail` : f.properties.nama, { sticky: true, direction: 'top' });
                     },
                 }).addTo(map);
             });
@@ -250,7 +261,7 @@ export function createMap(opsi) {
                 L.circleMarker([d.lat, d.lng], {
                     radius: Math.max(7, Math.min(18, Math.sqrt(d.luas_ha || 100) / 3.2)),
                     weight: 2, color: '#fff', fillColor: d.warna, fillOpacity: 0.9,
-                }).bindPopup(popupDi(d, this.internal)).bindTooltip('D.I. ' + d.nama, { direction: 'top' }).addTo(titikDi);
+                }).on('click', () => this.bukaDetail(d.id)).bindTooltip('D.I. ' + d.nama, { direction: 'top' }).addTo(titikDi);
             });
             layers.titikDi = titikDi;
             const aturTitik = () => {
@@ -296,6 +307,7 @@ export function createMap(opsi) {
                 layers.bangunan = lyr.addTo(map);
             }
             if (aturTitikFn) aturTitikFn();
+            this.gambarSorot();
         },
 
         /** Titik kejadian di peta mengikuti filter kabupaten, status, dan kata pencarian. */
@@ -322,16 +334,109 @@ export function createMap(opsi) {
         },
 
         fokus(d) {
-            if (d.lat && d.lng) map.flyTo([d.lat, d.lng], 12, { duration: 0.8 });
-            if (window.innerWidth < 1024) this.panel = false;
-            const layer = layers.fungsional;
-            if (layer) {
-                layer.eachLayer((l) => {
-                    if (l.feature.properties.kode === d.kode) {
-                        setTimeout(() => l.openPopup(), 850);
-                    }
-                });
+            this.bukaDetail(d.id);
+        },
+
+        /** Ringkasan D.I. terpilih dari data peta (status, luas, MT). */
+        get diPilih() {
+            return this.data?.daerah_irigasi.find((d) => d.id === this.detailId) || null;
+        },
+
+        async bukaDetail(id, { terbang = true } = {}) {
+            const ganti = this.detailId !== id;
+            this.detailId = id;
+            this.panel = true;
+            if (ganti) { this.detail = null; this.detailTab = 'foto'; this.$refs.panel?.scrollTo({ top: 0 }); }
+            this.detailMemuat = true;
+            this.detailGalat = null;
+            map.closePopup();
+            this.gambarSorot(terbang);
+            try {
+                const r = await fetch(`${opsi.apiDetail.replace('__ID__', id)}?tanggal=${this.tanggal}&_=${Date.now()}`, { headers: { Accept: 'application/json' }, cache: 'no-store' });
+                if (!r.ok) throw new Error(r.status);
+                const data = await r.json();
+                if (this.detailId !== id) return; // pengguna sudah membuka D.I. lain
+                this.detail = { ...data, foto_harian: data.foto_harian.map(siapkanGaleri) };
+                if (ganti && !this.detail.foto_harian.length) this.detailTab = 'sub';
+                this.gambarBangunanDi();
+            } catch (e) {
+                this.detailGalat = 'Detail D.I. gagal dimuat.';
             }
+            this.detailMemuat = false;
+        },
+
+        tutupDetail() {
+            this.detailId = null;
+            this.detail = null;
+            ['sorot', 'bangunanDi'].forEach((k) => { if (layers[k]) { map.removeLayer(layers[k]); layers[k] = null; } });
+        },
+
+        async muatFotoLama() {
+            if (!this.detail?.foto_sebelum || this.memuatLama) return;
+            this.memuatLama = true;
+            try {
+                const r = await fetch(`${opsi.apiDetail.replace('__ID__', this.detailId)}?sebelum=${this.detail.foto_sebelum}&_=${Date.now()}`, { headers: { Accept: 'application/json' }, cache: 'no-store' });
+                const data = await r.json();
+                this.detail.foto_harian.push(...data.foto_harian.map(siapkanGaleri));
+                this.detail.foto_sebelum = data.foto_sebelum;
+            } catch (e) { /* biarkan tombol bisa dicoba lagi */ }
+            this.memuatLama = false;
+        },
+
+        /** Klik kotak riwayat: buka tab foto & gulir ke tanggal itu. */
+        keTanggal(h) {
+            if (!h.foto) return;
+            this.detailTab = 'foto';
+            this.$nextTick(() => document.getElementById(`foto-${h.tanggal}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+        },
+
+        /** Garis tebal di batas D.I. terpilih, lalu peta diarahkan ke sana. */
+        gambarSorot(terbang = false) {
+            if (layers.sorot) { map.removeLayer(layers.sorot); layers.sorot = null; }
+            const d = this.diPilih;
+            if (!d) return;
+            const fitur = ['fungsional', 'baku'].flatMap((n) => (geo[n]?.features || []).filter((f) => f.properties.kode === d.kode));
+            if (fitur.length) {
+                layers.sorot = L.geoJSON({ type: 'FeatureCollection', features: fitur }, {
+                    interactive: false, style: { color: '#0F2A33', weight: 3.5, fill: false, dashArray: null },
+                }).addTo(map);
+            }
+            if (!terbang) return;
+            if (layers.sorot) map.flyToBounds(layers.sorot.getBounds(), { padding: [30, 30], maxZoom: 14, duration: 0.8 });
+            else if (d.lat) map.flyTo([d.lat, d.lng], 12, { duration: 0.8 });
+        },
+
+        /** Titik infrastruktur D.I. terpilih (yang sudah punya koordinat). */
+        gambarBangunanDi() {
+            if (layers.bangunanDi) { map.removeLayer(layers.bangunanDi); layers.bangunanDi = null; }
+            markerBangunan.clear();
+            if (!this.detail) return;
+            const lyr = L.layerGroup();
+            this.detail.bangunan.filter((b) => b.lat && b.lng).forEach((b) => {
+                const m = L.marker([b.lat, b.lng], { icon: ikonInfra(b.warna), zIndexOffset: 500 })
+                    .bindPopup(popupBangunan(b), { maxWidth: 260 }).bindTooltip(b.nama, { direction: 'top' }).addTo(lyr);
+                markerBangunan.set(b.id, m);
+            });
+            layers.bangunanDi = lyr.addTo(map);
+        },
+
+        fokusBangunan(b) {
+            if (!b.lat) return;
+            if (window.innerWidth < 1024) this.panel = false;
+            map.flyTo([b.lat, b.lng], Math.max(map.getZoom(), 16), { duration: 0.8 });
+            setTimeout(() => markerBangunan.get(b.id)?.openPopup(), 850);
+        },
+
+        get jumlahFoto() {
+            return (this.detail?.foto_harian || []).reduce((t, g) => t + g.semua.length, 0);
+        },
+        get rekapInfra() {
+            const r = { total: 0, baik: 0, rusak_ringan: 0, rusak_sedang: 0, rusak_berat: 0, belum: 0, titik: 0 };
+            (this.detail?.bangunan || []).forEach((b) => { r.total++; r[b.kondisi || 'belum']++; if (b.lat) r.titik++; });
+            return r;
+        },
+        galeri(list) {
+            return JSON.stringify(list.map((f) => ({ besar: f.besar, label: f.label || '' })));
         },
     };
 }

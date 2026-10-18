@@ -16,7 +16,7 @@
         </div>
     </header>
     <div class="min-h-0 flex-1">
-        @include('peta._peta', ['internal' => false, 'api' => route('api.publik.peta')])
+        @include('peta._peta', ['internal' => false, 'api' => route('api.publik.peta'), 'apiDetail' => route('api.publik.di', ['di' => '__ID__'])])
     </div>
 </div>
 </x-layouts.guest>
