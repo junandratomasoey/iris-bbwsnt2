@@ -22,11 +22,19 @@ class LaporanHarian extends Model
         'generatif' => 'Generatif (bunting–berbunga)', 'pemasakan' => 'Pemasakan', 'panen' => 'Panen',
     ];
 
+    public const KOMODITAS = ['padi' => 'Padi', 'palawija' => 'Palawija', 'horti' => 'Hortikultura'];
+
+    /** Pilihan cepat jenis tanaman (boleh diketik selain ini). */
+    public const JENIS = [
+        'palawija' => ['Jagung', 'Kedelai', 'Kacang tanah', 'Kacang hijau', 'Ubi kayu', 'Ubi jalar', 'Sorgum'],
+        'horti' => ['Cabai', 'Bawang merah', 'Tomat', 'Sawi', 'Kangkung', 'Terong', 'Kacang panjang', 'Semangka'],
+    ];
+
     public const VERIFIKASI = ['menunggu' => 'Menunggu', 'disetujui' => 'Disetujui', 'perbaikan' => 'Perlu perbaikan'];
 
     protected $fillable = [
         'tanggal', 'sub_daerah_irigasi_id', 'user_id', 'mt', 'debit_intake_lps', 'tma_cm', 'kondisi_saluran',
-        'bukaan_pintu_persen', 'fase_tanaman', 'luas_tanam_ha', 'luas_hijau_ha', 'luas_kering_ha', 'luas_panen_ha',
+        'bukaan_pintu_persen', 'fase_tanaman', 'luas_tanam_ha', 'luas_padi_ha', 'luas_palawija_ha', 'luas_horti_ha', 'jenis_palawija', 'jenis_horti', 'luas_hijau_ha', 'luas_kering_ha', 'luas_panen_ha',
         'luas_puso_ha', 'kendala', 'lat', 'lng', 'status_verifikasi', 'catatan_verifikasi', 'diverifikasi_oleh', 'diverifikasi_pada',
     ];
 
@@ -80,6 +88,30 @@ class LaporanHarian extends Model
             ->orderByRaw("CASE role WHEN 'manager' THEN 0 ELSE 1 END")->orderBy('name')->get();
 
         return $orang->isNotEmpty() ? $orang : User::aktif()->where('role', \App\Support\Role::ADMIN_OP)->orderBy('name')->get();
+    }
+
+    /**
+     * Rincian komoditas yang ditanam, mis. [['kode' => 'palawija', 'label' => 'Palawija', 'luas' => 30.0, 'jenis' => 'Jagung']].
+     *
+     * @return array<int, array{kode: string, label: string, luas: float, jenis: ?string}>
+     */
+    public function komoditas(): array
+    {
+        $hasil = [];
+        foreach (self::KOMODITAS as $k => $label) {
+            $luas = (float) $this->{"luas_{$k}_ha"};
+            if ($luas > 0) {
+                $hasil[] = ['kode' => $k, 'label' => $label, 'luas' => $luas, 'jenis' => $k === 'padi' ? null : $this->{"jenis_$k"}];
+            }
+        }
+
+        return $hasil;
+    }
+
+    /** "Padi 120 Ha · Palawija 30 Ha (Jagung)" */
+    public function ringkasKomoditas(): string
+    {
+        return collect($this->komoditas())->map(fn ($k) => $k['label'].' '.angka($k['luas'], floor($k['luas']) == $k['luas'] ? 0 : 2).' Ha'.($k['jenis'] ? " ({$k['jenis']})" : ''))->implode(' · ');
     }
 
     public function terkunci(): bool

@@ -67,6 +67,11 @@
         <h2 class="text-lg font-semibold">Luas lahan dari laporan</h2>
         <dl class="mt-3 space-y-3">
             <div class="flex items-baseline justify-between"><dt class="text-sm text-basalt-soft">Luas tanam</dt><dd class="font-gauge text-2xl font-semibold">{{ angka($ringkasan->sum('luas_tanam_ha'), 1) }} Ha</dd></div>
+            <div class="-mt-2 flex flex-wrap justify-end gap-x-3 text-xs text-basalt-soft">
+                <span>Padi <b class="text-basalt">{{ angka($ringkasan->sum('luas_padi_ha'), 1) }}</b></span>
+                <span>Palawija <b class="text-basalt">{{ angka($ringkasan->sum('luas_palawija_ha'), 1) }}</b></span>
+                <span>Hortikultura <b class="text-basalt">{{ angka($ringkasan->sum('luas_horti_ha'), 1) }}</b></span>
+            </div>
             <div class="flex items-baseline justify-between"><dt class="text-sm text-basalt-soft">Tanaman kekeringan</dt><dd class="font-gauge text-2xl font-semibold text-status-siaga">{{ angka($ringkasan->sum('luas_kering_ha'), 1) }} Ha</dd></div>
             <div class="flex items-baseline justify-between"><dt class="text-sm text-basalt-soft">Puso</dt><dd class="font-gauge text-2xl font-semibold text-status-kritis">{{ angka($ringkasan->sum('luas_puso_ha'), 1) }} Ha</dd></div>
             <div class="flex items-baseline justify-between"><dt class="text-sm text-basalt-soft">Panen</dt><dd class="font-gauge text-2xl font-semibold text-status-aman">{{ angka($ringkasan->sum('luas_panen_ha'), 1) }} Ha</dd></div>

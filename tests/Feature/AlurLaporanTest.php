@@ -192,4 +192,28 @@ class AlurLaporanTest extends TestCase
         $this->assertSame($manager->id, $a2->fresh()->diverifikasi_oleh);
         $this->assertSame('menunggu', $b1->fresh()->status_verifikasi);
     }
+
+    public function test_komoditas_padi_palawija_hortikultura(): void
+    {
+        $data = $this->dataLaporan(['luas_padi_ha' => 0, 'luas_palawija_ha' => 30, 'jenis_palawija' => 'Jagung, Kacang hijau',
+            'luas_horti_ha' => 5, 'jenis_horti' => 'Cabai', 'luas_tanam_ha' => 999, 'luas_hijau_ha' => 30, 'luas_kering_ha' => 5]);
+        $this->actingAs($this->petugas)->post('/laporan', $data)->assertSessionHasNoErrors();
+
+        $l = LaporanHarian::firstOrFail();
+        $this->assertEquals(35, $l->luas_tanam_ha);                         // dihitung ulang server: 0 + 30 + 5
+        $this->assertSame('Jagung, Kacang hijau', $l->jenis_palawija);
+        $this->assertSame('Palawija 30 Ha (Jagung, Kacang hijau) · Hortikultura 5 Ha (Cabai)', $l->ringkasKomoditas());
+        $this->actingAs($this->petugas)->get(route('laporan.show', $l))->assertSee('Kacang hijau');
+
+        // kekeringan tidak boleh melebihi total komoditas
+        $this->actingAs($this->petugas)->put(route('laporan.update', $l), array_merge($data, ['luas_kering_ha' => 40]))
+            ->assertSessionHasErrors('luas_kering_ha');
+
+        // jenis dikosongkan bila luasnya 0; form lama tanpa rincian → seluruhnya padi
+        $this->actingAs($this->petugas)->put(route('laporan.update', $l), array_merge($data, ['luas_horti_ha' => 0]))->assertSessionHasNoErrors();
+        $this->assertNull($l->fresh()->jenis_horti);
+        $lama = $this->dataLaporan(['tanggal' => today()->subDay()->toDateString()]);
+        $this->actingAs($this->petugas)->post('/laporan', $lama)->assertSessionHasNoErrors();
+        $this->assertEquals(200, LaporanHarian::whereDate('tanggal', today()->subDay())->value('luas_padi_ha'));
+    }
 }

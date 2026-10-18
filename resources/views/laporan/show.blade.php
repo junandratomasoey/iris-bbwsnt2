@@ -25,6 +25,14 @@
             <dl class="mt-5 grid grid-cols-2 gap-x-6 gap-y-3 border-t border-savana-line pt-4 text-sm sm:grid-cols-3">
                 <div><dt class="text-basalt-soft">Fase tanaman</dt><dd class="font-medium">{{ LH::FASE[$laporan->fase_tanaman] ?? '–' }}</dd></div>
                 <div><dt class="text-basalt-soft">Luas tanam</dt><dd class="font-medium">{{ angka($laporan->luas_tanam_ha, 2) }} Ha @if($s->luas_ha)<span class="text-basalt-mute">dari {{ angka($s->luas_ha) }} Ha</span>@endif</dd></div>
+                <div class="col-span-2 sm:col-span-3"><dt class="text-basalt-soft">Komoditas</dt>
+                    <dd class="mt-1 flex flex-wrap gap-2">
+                        @forelse($laporan->komoditas() as $k)
+                            <span class="rounded-md border border-savana-line px-2.5 py-1"><b>{{ $k['label'] }}</b> {{ angka($k['luas'], 2) }} Ha @if($k['jenis'])<span class="text-basalt-soft">· {{ $k['jenis'] }}</span>@endif</span>
+                        @empty
+                            <span class="text-basalt-mute">Tidak ada tanaman (bera)</span>
+                        @endforelse
+                    </dd></div>
                 <div><dt class="text-basalt-soft">Tanaman sehat</dt><dd class="font-medium">{{ angka($laporan->luas_hijau_ha, 2) }} Ha</dd></div>
                 <div><dt class="text-basalt-soft">Tanaman kekeringan</dt><dd class="font-medium text-status-siaga">{{ angka($laporan->luas_kering_ha, 2) }} Ha</dd></div>
                 <div><dt class="text-basalt-soft">Puso</dt><dd class="font-medium text-status-kritis">{{ angka($laporan->luas_puso_ha, 2) }} Ha</dd></div>

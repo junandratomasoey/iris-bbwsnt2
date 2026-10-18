@@ -10,6 +10,11 @@
         'bukaan_pintu_persen' => old('bukaan_pintu_persen', $laporan->bukaan_pintu_persen),
         'fase_tanaman' => old('fase_tanaman', $laporan->fase_tanaman),
         'luas_tanam_ha' => old('luas_tanam_ha', $laporan->luas_tanam_ha ?? 0),
+        'luas_padi_ha' => old('luas_padi_ha', $laporan->luas_padi_ha ?? 0),
+        'luas_palawija_ha' => old('luas_palawija_ha', $laporan->luas_palawija_ha ?? 0),
+        'luas_horti_ha' => old('luas_horti_ha', $laporan->luas_horti_ha ?? 0),
+        'jenis_palawija' => old('jenis_palawija', $laporan->jenis_palawija),
+        'jenis_horti' => old('jenis_horti', $laporan->jenis_horti),
         'luas_hijau_ha' => old('luas_hijau_ha', $laporan->luas_hijau_ha ?? 0),
         'luas_kering_ha' => old('luas_kering_ha', $laporan->luas_kering_ha ?? 0),
         'luas_panen_ha' => old('luas_panen_ha', $laporan->luas_panen_ha ?? 0),
@@ -98,20 +103,65 @@
     </fieldset>
 
     <fieldset class="panel space-y-4 p-4 sm:p-5">
-        <legend class="float-left mb-1 font-gauge text-lg font-semibold">Kondisi sawah</legend>
-        <x-field name="fase_tanaman" label="Fase tanaman dominan" class="clear-left">
+        <legend class="float-left mb-1 font-gauge text-lg font-semibold">Kondisi tanaman</legend>
+        <div class="clear-left">
+            <span class="label">Komoditas yang ditanam</span>
+            <div class="grid grid-cols-3 gap-2" role="group" aria-label="Komoditas">
+                @foreach(LH::KOMODITAS as $k => $l)
+                    <button type="button" @click="pakai.{{ $k }} = !pakai.{{ $k }}" :aria-pressed="pakai.{{ $k }}"
+                            :class="pakai.{{ $k }} ? 'border-saluran-600 bg-saluran-600 text-white' : 'border-savana-line text-basalt-soft'"
+                            class="flex min-w-0 items-center justify-center gap-1 rounded-md border px-1 py-2.5 text-[13px] font-medium sm:text-sm">
+                        <svg x-show="pakai.{{ $k }}" class="h-3.5 w-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>{{ $l }}
+                    </button>
+                @endforeach
+            </div>
+            <p class="mt-1 text-xs text-basalt-mute">Pilih lebih dari satu bila sebagian ditanam padi dan sebagian palawija/hortikultura. Pilih kosong bila sawah bera.</p>
+        </div>
+
+        @foreach(LH::KOMODITAS as $k => $l)
+            <input type="hidden" name="luas_{{ $k }}_ha" :value="pakai.{{ $k }} ? (f.luas_{{ $k }}_ha || 0) : 0">
+            <div x-show="pakai.{{ $k }}" x-cloak class="rounded-md border border-savana-line p-3">
+                <x-field :name="'luas_'.$k.'_ha'" :label="'Luas tanam '.strtolower($l).' (Ha)'">
+                    <input id="luas_{{ $k }}_ha" type="number" step="0.01" min="0" inputmode="decimal" x-model="f.luas_{{ $k }}_ha" class="input py-2.5 tabular-nums">
+                </x-field>
+                @if($k !== 'padi')
+                    <div class="mt-3">
+                        <span class="label">Jenis {{ strtolower($l) }}</span>
+                        <div class="flex flex-wrap gap-1.5">
+                            @foreach(LH::JENIS[$k] as $j)
+                                <button type="button" @click="pilihJenis('{{ $k }}', '{{ $j }}')" :aria-pressed="adaJenis('{{ $k }}', '{{ $j }}')"
+                                        :class="adaJenis('{{ $k }}', '{{ $j }}') ? 'border-saluran-600 bg-saluran-50 text-saluran-700' : 'border-savana-line text-basalt-soft'"
+                                        class="rounded-full border px-2.5 py-1 text-xs font-medium">{{ $j }}</button>
+                            @endforeach
+                        </div>
+                        <input name="jenis_{{ $k }}" x-model="f.jenis_{{ $k }}" maxlength="150" class="input mt-2 py-2 text-sm" placeholder="Ketuk pilihan di atas atau ketik, pisahkan dengan koma">
+                        @error('jenis_'.$k)<p class="mt-1 text-xs font-medium text-status-kritis">{{ $message }}</p>@enderror
+                    </div>
+                @endif
+            </div>
+        @endforeach
+
+        <div class="flex items-baseline justify-between rounded-md bg-savana px-3 py-2">
+            <span class="text-sm text-basalt-soft">Luas tanam total</span>
+            <span class="font-gauge text-xl font-semibold tabular-nums"><span x-text="luasTanam.toLocaleString('id-ID', { maximumFractionDigits: 2 })"></span> Ha</span>
+            <input type="hidden" name="luas_tanam_ha" :value="luasTanam">
+        </div>
+        @error('luas_tanam_ha')<p class="text-xs font-medium text-status-kritis">{{ $message }}</p>@enderror
+
+        <x-field name="fase_tanaman" label="Fase tanaman dominan">
             <select id="fase_tanaman" name="fase_tanaman" x-model="f.fase_tanaman" class="input py-2.5">
                 <option value="">Pilih fase</option>
                 @foreach(LH::FASE as $k => $l)<option value="{{ $k }}">{{ $l }}</option>@endforeach
             </select>
         </x-field>
         <div class="grid grid-cols-2 gap-4">
-            @foreach(['luas_tanam_ha' => ['Luas tanam (Ha)', 'Total sawah yang ditanami.'], 'luas_hijau_ha' => ['Tanaman sehat/hijau (Ha)', 'Mendapat air cukup.'], 'luas_kering_ha' => ['Tanaman kekeringan (Ha)', 'Ditanam tetapi kurang air.'], 'luas_puso_ha' => ['Puso (Ha)', 'Gagal, tidak bisa dipanen.'], 'luas_panen_ha' => ['Luas panen (Ha)', 'Dipanen hari ini / periode ini.']] as $n => [$lbl, $hint])
+            @foreach(['luas_hijau_ha' => ['Tanaman sehat/hijau (Ha)', 'Mendapat air cukup.'], 'luas_kering_ha' => ['Tanaman kekeringan (Ha)', 'Ditanam tetapi kurang air.'], 'luas_puso_ha' => ['Puso (Ha)', 'Gagal, tidak bisa dipanen.'], 'luas_panen_ha' => ['Luas panen (Ha)', 'Dipanen hari ini / periode ini.']] as $n => [$lbl, $hint])
                 <x-field :name="$n" :label="$lbl" :hint="$hint" wajib>
                     <input id="{{ $n }}" name="{{ $n }}" type="number" step="0.01" min="0" inputmode="decimal" x-model="f.{{ $n }}" required class="input py-2.5 tabular-nums">
                 </x-field>
             @endforeach
         </div>
+        <p class="-mt-2 text-xs text-basalt-mute">Sehat, kekeringan, puso, dan panen diisi untuk semua komoditas sekaligus.</p>
         <p x-show="peringatanLuas" x-cloak class="text-sm font-medium text-status-siaga" x-text="peringatanLuas"></p>
         <div class="flex items-center gap-2 rounded-md bg-savana px-3 py-2 text-sm">
             <span class="text-basalt-soft">Perkiraan status:</span>

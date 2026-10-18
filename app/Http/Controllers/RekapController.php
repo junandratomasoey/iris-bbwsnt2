@@ -27,19 +27,19 @@ class RekapController extends Controller
             fputcsv($out, [], ';');
             fputcsv($out, ['Kode', 'D.I.', 'Kabupaten', 'Satgas', 'Luas fungsional (Ha)', 'Status terberat', 'Status tersering',
                 'Hari kritis', 'Hari siaga', 'Hari waspada', 'Hari aman', 'Hari tanpa laporan', 'Jumlah Sub-D.I.', 'Jumlah laporan', 'Kepatuhan lapor (%)',
-                'Puncak luas tanam (Ha)', 'Puncak tanaman kekeringan (Ha)', 'Puncak puso (Ha)', 'Puncak panen (Ha)', 'Debit rata-rata (L/dt)', 'Debit minimum (L/dt)'], ';');
+                'Puncak luas tanam (Ha)', 'Puncak padi (Ha)', 'Puncak palawija (Ha)', 'Puncak hortikultura (Ha)', 'Puncak tanaman kekeringan (Ha)', 'Puncak puso (Ha)', 'Puncak panen (Ha)', 'Debit rata-rata (L/dt)', 'Debit minimum (L/dt)'], ';');
             foreach (collect($r['di'])->sortBy('kode') as $d) {
                 fputcsv($out, [
                     $d['kode'], $d['nama'], $d['kabupaten'], $d['satgas'], $d['luas_ha'], SK::label($d['terberat']), SK::label($d['tersering']),
                     $d['hari']['kritis'], $d['hari']['siaga'], $d['hari']['waspada'], $d['hari']['aman'], $d['hari']['kosong'],
                     $d['jumlah_sub'], $d['laporan'], $d['kepatuhan'],
-                    $d['puncak_tanam_ha'], $d['puncak_kering_ha'], $d['puncak_puso_ha'], $d['puncak_panen_ha'], $d['debit_rata_lps'], $d['debit_min_lps'],
+                    $d['puncak_tanam_ha'], $d['puncak_padi_ha'], $d['puncak_palawija_ha'], $d['puncak_horti_ha'], $d['puncak_kering_ha'], $d['puncak_puso_ha'], $d['puncak_panen_ha'], $d['debit_rata_lps'], $d['debit_min_lps'],
                 ], ';');
             }
             $t = $r['total'];
             fputcsv($out, ['', 'TOTAL', '', '', collect($r['di'])->sum('luas_ha'), '', '',
                 $t['hari_di']['kritis'], $t['hari_di']['siaga'], $t['hari_di']['waspada'], $t['hari_di']['aman'], $t['hari_di']['kosong'],
-                $t['jumlah_sub'], $t['laporan'], $t['kepatuhan'], $t['puncak_tanam_ha'], $t['puncak_kering_ha'], $t['puncak_puso_ha'], $t['puncak_panen_ha'], '', ''], ';');
+                $t['jumlah_sub'], $t['laporan'], $t['kepatuhan'], $t['puncak_tanam_ha'], $t['puncak_padi_ha'], $t['puncak_palawija_ha'], $t['puncak_horti_ha'], $t['puncak_kering_ha'], $t['puncak_puso_ha'], $t['puncak_panen_ha'], '', ''], ';');
 
             fputcsv($out, [], ';');
             fputcsv($out, ['Kepatuhan lapor per Satgas'], ';');

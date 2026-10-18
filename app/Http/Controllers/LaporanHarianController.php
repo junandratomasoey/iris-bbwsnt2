@@ -51,7 +51,8 @@ class LaporanHarianController extends Controller
             ? LaporanHarian::where('sub_daerah_irigasi_id', $laporan->sub_daerah_irigasi_id)->latest('tanggal')->first()
             : null;
         if ($sebelumnya) {
-            $laporan->fill($sebelumnya->only(['debit_intake_lps', 'tma_cm', 'kondisi_saluran', 'bukaan_pintu_persen', 'fase_tanaman', 'luas_tanam_ha', 'luas_hijau_ha', 'luas_kering_ha', 'luas_panen_ha', 'luas_puso_ha']));
+            $laporan->fill($sebelumnya->only(['debit_intake_lps', 'tma_cm', 'kondisi_saluran', 'bukaan_pintu_persen', 'fase_tanaman', 'luas_tanam_ha',
+                'luas_padi_ha', 'luas_palawija_ha', 'luas_horti_ha', 'jenis_palawija', 'jenis_horti', 'luas_hijau_ha', 'luas_kering_ha', 'luas_panen_ha', 'luas_puso_ha']));
         }
 
         return view('laporan.form', compact('laporan', 'subs', 'sebelumnya'));
@@ -179,14 +180,14 @@ class LaporanHarianController extends Controller
         return response()->streamDownload(function () use ($q) {
             $out = fopen('php://output', 'w');
             fwrite($out, "\xEF\xBB\xBF"); // BOM agar Excel membaca UTF-8
-            fputcsv($out, ['Tanggal', 'Kabupaten', 'D.I.', 'Sub-D.I.', 'MT', 'Debit intake (L/dt)', 'TMA (cm)', 'Kondisi saluran', 'Bukaan pintu (%)', 'Fase', 'Luas tanam (Ha)', 'Luas hijau (Ha)', 'Luas kekeringan (Ha)', 'Luas panen (Ha)', 'Luas puso (Ha)', 'Status', 'Kendala', 'Pelapor', 'Verifikasi', 'Lat', 'Lng'], ';');
+            fputcsv($out, ['Tanggal', 'Kabupaten', 'D.I.', 'Sub-D.I.', 'MT', 'Debit intake (L/dt)', 'TMA (cm)', 'Kondisi saluran', 'Bukaan pintu (%)', 'Fase', 'Luas tanam (Ha)', 'Padi (Ha)', 'Palawija (Ha)', 'Jenis palawija', 'Hortikultura (Ha)', 'Jenis hortikultura', 'Luas hijau (Ha)', 'Luas kekeringan (Ha)', 'Luas panen (Ha)', 'Luas puso (Ha)', 'Status', 'Kendala', 'Pelapor', 'Verifikasi', 'Lat', 'Lng'], ';');
             $q->chunk(500, function ($rows) use ($out) {
                 foreach ($rows as $l) {
                     $s = $l->subDaerahIrigasi;
                     fputcsv($out, [
                         $l->tanggal->format('Y-m-d'), $s->daerahIrigasi->kabupaten?->nama, $s->daerahIrigasi->nama, $s->nama, $l->mt,
                         $l->debit_intake_lps, $l->tma_cm, $l->kondisi_saluran, $l->bukaan_pintu_persen, $l->fase_tanaman,
-                        $l->luas_tanam_ha, $l->luas_hijau_ha, $l->luas_kering_ha, $l->luas_panen_ha, $l->luas_puso_ha,
+                        $l->luas_tanam_ha, $l->luas_padi_ha, $l->luas_palawija_ha, $l->jenis_palawija, $l->luas_horti_ha, $l->jenis_horti, $l->luas_hijau_ha, $l->luas_kering_ha, $l->luas_panen_ha, $l->luas_puso_ha,
                         StatusKondisi::label($l->status()), $l->kendala, $l->user?->name, $l->status_verifikasi, $l->lat, $l->lng,
                     ], ';');
                 }
@@ -226,6 +227,21 @@ class LaporanHarianController extends Controller
         $batasMundur = $pengelola ? '2000-01-01' : today()->subDays(7)->toDateString();
         $maksFoto = 5 - ($laporan?->foto()->count() ?? 0);
 
+        // Luas tanam = padi + palawija + hortikultura. Form lama (tanpa rincian) dianggap seluruhnya padi.
+        $rincian = ['luas_padi_ha', 'luas_palawija_ha', 'luas_horti_ha'];
+        if (collect($rincian)->contains(fn ($k) => $request->has($k))) {
+            $angka = fn ($k) => is_numeric($request->input($k)) ? (float) $request->input($k) : 0.0;
+            $request->merge(['luas_tanam_ha' => round(collect($rincian)->sum($angka), 2)]
+                + collect($rincian)->mapWithKeys(fn ($k) => [$k => $request->filled($k) ? $request->input($k) : 0])->all());
+        } else {
+            $request->merge(['luas_padi_ha' => $request->input('luas_tanam_ha'), 'luas_palawija_ha' => 0, 'luas_horti_ha' => 0]);
+        }
+        foreach (['palawija', 'horti'] as $k) { // jenis hanya disimpan bila luasnya diisi
+            if (! ((float) $request->input("luas_{$k}_ha") > 0)) {
+                $request->merge(["jenis_$k" => null]);
+            }
+        }
+
         return $request->validate([
             'tanggal' => ['required', 'date', 'before_or_equal:today', 'after_or_equal:'.$batasMundur],
             'sub_daerah_irigasi_id' => [
@@ -238,6 +254,11 @@ class LaporanHarianController extends Controller
             'bukaan_pintu_persen' => ['nullable', 'integer', 'between:0,100'],
             'fase_tanaman' => ['nullable', Rule::in(array_keys(LaporanHarian::FASE))],
             'luas_tanam_ha' => ['required', 'numeric', 'min:0', 'max:20000'],
+            'luas_padi_ha' => ['nullable', 'numeric', 'min:0', 'max:20000'],
+            'luas_palawija_ha' => ['nullable', 'numeric', 'min:0', 'max:20000'],
+            'luas_horti_ha' => ['nullable', 'numeric', 'min:0', 'max:20000'],
+            'jenis_palawija' => ['nullable', 'string', 'max:150'],
+            'jenis_horti' => ['nullable', 'string', 'max:150'],
             'luas_hijau_ha' => ['required', 'numeric', 'min:0', 'lte:luas_tanam_ha'],
             'luas_kering_ha' => ['required', 'numeric', 'min:0', 'lte:luas_tanam_ha'],
             'luas_panen_ha' => ['required', 'numeric', 'min:0', 'max:20000'],
@@ -258,7 +279,8 @@ class LaporanHarianController extends Controller
             'foto.max' => 'Maksimal 5 foto per laporan.',
         ], [
             'sub_daerah_irigasi_id' => 'Sub-D.I.', 'debit_intake_lps' => 'debit intake', 'tma_cm' => 'TMA',
-            'luas_tanam_ha' => 'luas tanam', 'luas_hijau_ha' => 'luas hijau', 'luas_kering_ha' => 'luas kekeringan',
+            'luas_tanam_ha' => 'luas tanam', 'luas_padi_ha' => 'luas padi', 'luas_palawija_ha' => 'luas palawija', 'luas_horti_ha' => 'luas hortikultura',
+            'jenis_palawija' => 'jenis palawija', 'jenis_horti' => 'jenis hortikultura', 'luas_hijau_ha' => 'luas hijau', 'luas_kering_ha' => 'luas kekeringan',
             'luas_panen_ha' => 'luas panen', 'luas_puso_ha' => 'luas puso', 'kondisi_saluran' => 'kondisi saluran',
         ]);
     }

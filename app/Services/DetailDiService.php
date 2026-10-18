@@ -95,6 +95,7 @@ class DetailDiService
                         'status' => $st, 'status_label' => StatusKondisi::label($st), 'warna' => StatusKondisi::WARNA[$st],
                         'kondisi' => LaporanHarian::KONDISI[$l->kondisi_saluran] ?? $l->kondisi_saluran,
                         'fase' => LaporanHarian::FASE[$l->fase_tanaman] ?? null,
+                        'komoditas' => $l->ringkasKomoditas(),
                         'kendala' => $l->kendala,
                         'terverifikasi' => $l->status_verifikasi === 'disetujui',
                         'foto' => $l->foto->map(fn ($f) => ['kecil' => $f->url_kecil, 'besar' => $f->url, 'label' => trim(($l->subDaerahIrigasi?->nama ?? '').' · '.$t->translatedFormat('d M Y'), ' ·')])->values(),
@@ -195,6 +196,7 @@ class DetailDiService
                 'tanggal' => $l->tanggal->translatedFormat('d M Y'),
                 'kondisi' => LaporanHarian::KONDISI[$l->kondisi_saluran] ?? $l->kondisi_saluran,
                 'fase' => LaporanHarian::FASE[$l->fase_tanaman] ?? null,
+                'komoditas' => $l->ringkasKomoditas(),
                 'tanam' => (float) $l->luas_tanam_ha, 'kering' => (float) $l->luas_kering_ha, 'puso' => (float) $l->luas_puso_ha,
             ] + ($internal ? ['debit' => (float) $l->debit_intake_lps, 'tma' => (float) $l->tma_cm, 'url' => route('laporan.show', $l)] : []) : null,
         ] + ($internal ? [

@@ -27,7 +27,7 @@ class RekapService
 
     public function rekap(Periode $p, ?array $subIds = null): array
     {
-        $kunci = 'rekap:v3:'.md5(json_encode($subIds)).':'.$p->dari->toDateString().':'.$p->sampai->toDateString();
+        $kunci = 'rekap:v4:'.md5(json_encode($subIds)).':'.$p->dari->toDateString().':'.$p->sampai->toDateString();
         $ttl = $p->sampai->isToday() ? 300 : 3600;
 
         return Cache::remember($kunci, $ttl, fn () => $this->hitung($p, $subIds));
@@ -73,7 +73,7 @@ class RekapService
             if (! $diId || ! isset($diHari[$diId])) {
                 return;
             }
-            $st = ['tanam' => 0.0, 'kering' => 0.0, 'puso' => 0.0, 'panen' => 0.0, 'debit' => 0.0, 'debit_n' => 0, 'debit_min' => null, 'laporan' => 0];
+            $st = ['tanam' => 0.0, 'padi' => 0.0, 'palawija' => 0.0, 'horti' => 0.0, 'kering' => 0.0, 'puso' => 0.0, 'panen' => 0.0, 'debit' => 0.0, 'debit_n' => 0, 'debit_min' => null, 'laporan' => 0];
             $dari = $p->dari->toDateString();
             foreach ($baris as $b) {
                 if ($b['tanggal'] < $dari) {
@@ -81,6 +81,9 @@ class RekapService
                 }
                 $st['laporan']++;
                 $st['tanam'] = max($st['tanam'], $b['tanam']);
+                foreach (['padi', 'palawija', 'horti'] as $k) {
+                    $st[$k] = max($st[$k], $b[$k]);
+                }
                 $st['kering'] = max($st['kering'], $b['kering']);
                 $st['puso'] = max($st['puso'], $b['puso']);
                 $st['panen'] = max($st['panen'], $b['panen']);
@@ -108,7 +111,7 @@ class RekapService
         };
 
         $cursor = LaporanHarian::query()->toBase()
-            ->select(['sub_daerah_irigasi_id', 'tanggal', 'kondisi_saluran', 'luas_tanam_ha', 'luas_kering_ha', 'luas_puso_ha', 'luas_panen_ha', 'debit_intake_lps'])
+            ->select(['sub_daerah_irigasi_id', 'tanggal', 'kondisi_saluran', 'luas_tanam_ha', 'luas_padi_ha', 'luas_palawija_ha', 'luas_horti_ha', 'luas_kering_ha', 'luas_puso_ha', 'luas_panen_ha', 'debit_intake_lps'])
             ->whereBetween('tanggal', [$p->dari->copy()->subDays(SK::MASA_BERLAKU_HARI - 1)->toDateString(), $p->sampai->toDateString()])
             ->where('status_verifikasi', '!=', 'perbaikan')
             ->when($subIds !== null, fn ($q) => $q->whereIn('sub_daerah_irigasi_id', $subIds))
@@ -131,6 +134,7 @@ class RekapService
                 'tanggal' => substr((string) $r->tanggal, 0, 10),
                 'kode' => SK::URUTAN[SK::dariNilai($r->kondisi_saluran, $tanam, $kering, $puso)],
                 'tanam' => $tanam, 'kering' => $kering, 'puso' => $puso,
+                'padi' => (float) $r->luas_padi_ha, 'palawija' => (float) $r->luas_palawija_ha, 'horti' => (float) $r->luas_horti_ha,
                 'panen' => (float) $r->luas_panen_ha, 'debit' => (float) $r->debit_intake_lps,
             ];
         }
@@ -169,7 +173,9 @@ class RekapService
                 'terberat' => $terberat, 'tersering' => $tersering,
                 'jumlah_sub' => $jumlahSub, 'laporan' => $laporan,
                 'kepatuhan' => $jumlahSub ? (int) round($laporan / ($jumlahSub * $n) * 100) : 0,
-                'puncak_tanam_ha' => round($st->sum('tanam'), 2), 'puncak_kering_ha' => round($st->sum('kering'), 2),
+                'puncak_tanam_ha' => round($st->sum('tanam'), 2),
+                'puncak_padi_ha' => round($st->sum('padi'), 2), 'puncak_palawija_ha' => round($st->sum('palawija'), 2), 'puncak_horti_ha' => round($st->sum('horti'), 2),
+                'puncak_kering_ha' => round($st->sum('kering'), 2),
                 'puncak_puso_ha' => round($st->sum('puso'), 2), 'puncak_panen_ha' => round($st->sum('panen'), 2),
                 'debit_rata_lps' => $debitN ? round($st->sum('debit') / $debitN, 1) : null,
                 'debit_min_lps' => $st->whereNotNull('debit_min')->min('debit_min'),
@@ -226,6 +232,9 @@ class RekapService
                 'kepatuhan' => $subs->count() ? (int) round($koleksi->sum('laporan') / ($subs->count() * $n) * 100) : 0,
                 'hari_di' => collect(self::KODE)->mapWithKeys(fn ($s) => [$s => $koleksi->sum(fn ($d) => $d['hari'][$s])])->all(),
                 'puncak_tanam_ha' => round($koleksi->sum('puncak_tanam_ha'), 1),
+                'puncak_padi_ha' => round($koleksi->sum('puncak_padi_ha'), 1),
+                'puncak_palawija_ha' => round($koleksi->sum('puncak_palawija_ha'), 1),
+                'puncak_horti_ha' => round($koleksi->sum('puncak_horti_ha'), 1),
                 'puncak_kering_ha' => round($koleksi->sum('puncak_kering_ha'), 1),
                 'puncak_puso_ha' => round($koleksi->sum('puncak_puso_ha'), 1),
                 'puncak_panen_ha' => round($koleksi->sum('puncak_panen_ha'), 1),

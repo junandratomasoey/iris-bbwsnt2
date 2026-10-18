@@ -32,8 +32,19 @@ export function laporanForm(opsi) {
         pesanOffline: false,
 
         get kunciDraf() { return `iris-draf-laporan-${this.f.sub_daerah_irigasi_id || 'x'}`; },
+        pakai: { padi: false, palawija: false, horti: false },
+        /** total = padi + palawija + hortikultura yang dicentang */
+        get luasTanam() {
+            return Math.round(['padi', 'palawija', 'horti'].reduce((t, k) => t + (this.pakai[k] ? (+this.f[`luas_${k}_ha`] || 0) : 0), 0) * 100) / 100;
+        },
+        daftarJenis(k) { return String(this.f[`jenis_${k}`] || '').split(',').map((x) => x.trim()).filter(Boolean); },
+        adaJenis(k, j) { return this.daftarJenis(k).some((x) => x.toLowerCase() === j.toLowerCase()); },
+        pilihJenis(k, j) {
+            const d = this.daftarJenis(k);
+            this.f[`jenis_${k}`] = (this.adaJenis(k, j) ? d.filter((x) => x.toLowerCase() !== j.toLowerCase()) : [...d, j]).join(', ');
+        },
         get statusPratinjau() {
-            const t = +this.f.luas_tanam_ha || 0;
+            const t = this.luasTanam;
             const rk = t > 0 ? (+this.f.luas_kering_ha || 0) / t : 0;
             if ((+this.f.luas_puso_ha || 0) > 0 || rk >= 0.5) return 'kritis';
             let s = { penuh: 'aman', normal: 'aman', kurang: 'waspada', kering: 'siaga' }[this.f.kondisi_saluran] || 'kosong';
@@ -56,11 +67,15 @@ export function laporanForm(opsi) {
         },
         get peringatanLuas() {
             const luas = this.luasSub[this.f.sub_daerah_irigasi_id];
-            if (luas && +this.f.luas_tanam_ha > luas * 1.05) return `Luas tanam melebihi luas Sub-D.I. (${luas.toLocaleString('id-ID')} Ha). Periksa kembali.`;
+            if (luas && this.luasTanam > luas * 1.05) return `Luas tanam melebihi luas Sub-D.I. (${luas.toLocaleString('id-ID')} Ha). Periksa kembali.`;
             return null;
         },
 
         init() {
+            // komoditas aktif = yang luasnya terisi; laporan baru tanpa angka → padi
+            ['padi', 'palawija', 'horti'].forEach((k) => { this.pakai[k] = (+this.f[`luas_${k}_ha`] || 0) > 0; });
+            if (!this.pakai.palawija && !this.pakai.horti && !this.pakai.padi && (this.baru || +this.f.luas_tanam_ha > 0)) this.pakai.padi = true;
+            if (this.pakai.padi && !(+this.f.luas_padi_ha) && +this.f.luas_tanam_ha > 0) this.f.luas_padi_ha = this.f.luas_tanam_ha;
             window.addEventListener('online', () => (this.online = true));
             window.addEventListener('offline', () => (this.online = false));
             if (opsi.hapusDraf) this.hapusDraf();
@@ -81,7 +96,11 @@ export function laporanForm(opsi) {
         pulihkanDraf() {
             try {
                 const d = JSON.parse(localStorage.getItem(this.kunciDraf));
-                if (d) { delete d._waktu; Object.assign(this.f, d); }
+                if (d) {
+                    delete d._waktu;
+                    Object.assign(this.f, d);
+                    ['padi', 'palawija', 'horti'].forEach((k) => { this.pakai[k] = (+this.f[`luas_${k}_ha`] || 0) > 0; });
+                }
             } catch (e) {}
             this.adaDraf = false;
         },

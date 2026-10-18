@@ -49,7 +49,7 @@ class KondisiService
         return $diList->mapWithKeys(function (DaerahIrigasi $di) use ($subs, $laporan, $tanggal) {
             $daftar = $subs->get($di->id, collect());
             $status = StatusKondisi::KOSONG;
-            $agg = ['tanam' => 0, 'kering' => 0, 'puso' => 0, 'panen' => 0, 'debit' => 0, 'lapor' => 0];
+            $agg = ['tanam' => 0, 'kering' => 0, 'puso' => 0, 'panen' => 0, 'debit' => 0, 'lapor' => 0, 'padi' => 0, 'palawija' => 0, 'horti' => 0];
             $terakhir = null;
             $hitung = array_fill_keys(array_keys(StatusKondisi::URUTAN), 0);
             foreach ($daftar as $s) {
@@ -62,6 +62,9 @@ class KondisiService
                 $status = StatusKondisi::maks($status, $st);
                 $agg['lapor']++;
                 $agg['tanam'] += (float) $l->luas_tanam_ha;
+                $agg['padi'] += (float) $l->luas_padi_ha;
+                $agg['palawija'] += (float) $l->luas_palawija_ha;
+                $agg['horti'] += (float) $l->luas_horti_ha;
                 $agg['kering'] += (float) $l->luas_kering_ha;
                 $agg['puso'] += (float) $l->luas_puso_ha;
                 $agg['panen'] += (float) $l->luas_panen_ha;
@@ -87,6 +90,9 @@ class KondisiService
                 'sub_lapor' => $agg['lapor'],
                 'sub_per_status' => $hitung,
                 'luas_tanam_ha' => round($agg['tanam'], 2),
+                'luas_padi_ha' => round($agg['padi'], 2),
+                'luas_palawija_ha' => round($agg['palawija'], 2),
+                'luas_horti_ha' => round($agg['horti'], 2),
                 'luas_kering_ha' => round($agg['kering'], 2),
                 'luas_puso_ha' => round($agg['puso'], 2),
                 'luas_panen_ha' => round($agg['panen'], 2),

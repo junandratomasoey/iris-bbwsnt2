@@ -85,6 +85,7 @@
                         @if($internal)
                             <p class="text-[11px] text-basalt-mute"><span x-text="`Debit ${fmt(l.debit, 1)} L/dt · TMA ${fmt(l.tma, 1)} cm · ${l.pelapor ?? ''}`"></span> · <a :href="l.url" class="font-semibold text-saluran-600">Detail</a></p>
                         @endif
+                        <p x-show="l.komoditas" class="text-[11px] text-basalt-soft" x-text="l.komoditas"></p>
                         <p x-show="l.kendala" class="mt-0.5 text-xs italic text-basalt-soft" x-text="l.kendala"></p>
                         <div class="mt-1.5 grid grid-cols-3 gap-1">
                             <template x-for="f in l.foto" :key="f.besar">
@@ -117,6 +118,7 @@
                     <template x-if="s.laporan">
                         <div class="mt-1 text-basalt-soft">
                             <p x-text="`${s.laporan.tanggal} · saluran ${String(s.laporan.kondisi).toLowerCase()}${s.laporan.fase ? ' · ' + s.laporan.fase : ''}`"></p>
+                            <p x-show="s.laporan.komoditas" x-text="s.laporan.komoditas"></p>
                             <p>Tanam <b class="text-basalt" x-text="fmt(s.laporan.tanam, 1)"></b> · kering <b class="text-basalt" x-text="fmt(s.laporan.kering, 1)"></b> · puso <b class="text-basalt" x-text="fmt(s.laporan.puso, 1)"></b> Ha</p>
                             @if($internal)<p>Debit <b class="text-basalt" x-text="fmt(s.laporan.debit, 1)"></b> L/dt · TMA <b class="text-basalt" x-text="fmt(s.laporan.tma, 1)"></b> cm · <a :href="s.laporan.url" class="font-semibold text-saluran-600">Laporan</a></p>@endif
                         </div>
