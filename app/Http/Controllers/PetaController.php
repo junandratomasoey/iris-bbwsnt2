@@ -47,7 +47,7 @@ class PetaController extends Controller
             'daerah_irigasi' => $di,
             'kejadian' => $kejadian,
             'legenda' => $this->legenda(),
-        ])->header('Cache-Control', 'public, max-age=300');
+        ])->header('Cache-Control', 'no-cache, private');
     }
 
     public function dataInternal(Request $request)

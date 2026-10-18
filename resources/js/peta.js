@@ -200,7 +200,8 @@ export function createMap(opsi) {
             this.memuat = true;
             this.galat = null;
             try {
-                const r = await fetch(`${opsi.api}?tanggal=${this.tanggal}`, { headers: { Accept: 'application/json' } });
+                // cache: 'no-store' + penanda waktu agar foto/laporan baru langsung tampil (tidak terhalang cache browser/hosting)
+                const r = await fetch(`${opsi.api}?tanggal=${this.tanggal}&_=${Date.now()}`, { headers: { Accept: 'application/json' }, cache: 'no-store' });
                 if (!r.ok) throw new Error(r.status);
                 this.data = await r.json();
                 this.gambar();
