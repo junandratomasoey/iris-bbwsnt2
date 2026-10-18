@@ -48,7 +48,8 @@ Route::middleware(['auth', 'siap'])->group(function () {
     Route::delete('/kejadian/{kejadian}/foto/{foto}', [KejadianController::class, 'hapusFoto'])->name('kejadian.foto.destroy');
     Route::resource('kejadian', KejadianController::class)->parameters(['kejadian' => 'kejadian']);
 
-    Route::get('/petugas', [PetugasController::class, 'index'])->name('petugas.index');
+    Route::post('/petugas/{petugas}/reset-password', [PetugasController::class, 'resetPassword'])->name('petugas.reset');
+    Route::resource('petugas', PetugasController::class)->parameters(['petugas' => 'petugas'])->except(['show']);
 
     // master data: semua user internal boleh melihat, hanya pengelola yang mengubah (dicek di controller)
     Route::prefix('master')->name('master.')->group(function () {
