@@ -2,13 +2,13 @@
   "name": "IRIS BBWS Nusa Tenggara II",
   "short_name": "IRIS NT II",
   "description": "Laporan harian kondisi irigasi dan kekeringan sawah di Nusa Tenggara Timur",
-  "start_url": "/dashboard",
-  "scope": "/",
+  "start_url": "dashboard",
+  "scope": "./",
   "display": "standalone",
   "background_color": "#F3F5F2",
   "theme_color": "#0F5E6E",
   "lang": "id",
   "icons": [
-    { "src": "/ikon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+    { "src": "ikon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
   ]
 }

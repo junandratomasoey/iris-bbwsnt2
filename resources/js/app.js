@@ -3,6 +3,7 @@ import Alpine from 'alpinejs';
 import { createMap } from './peta';
 import { laporanForm } from './laporan-form';
 import { pickLocation } from './pick-location';
+import { ASSET } from './base';
 
 window.Alpine = Alpine;
 Alpine.data('peta', createMap);
@@ -11,5 +12,5 @@ Alpine.data('pickLocation', pickLocation);
 Alpine.start();
 
 if ('serviceWorker' in navigator && window.location.protocol === 'https:') {
-    window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
+    window.addEventListener('load', () => navigator.serviceWorker.register(`${ASSET}/sw.js`, { scope: `${ASSET}/` }).catch(() => {}));
 }

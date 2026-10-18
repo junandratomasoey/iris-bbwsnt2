@@ -8,4 +8,10 @@ export default defineConfig({
             refresh: true,
         }),
     ],
+    // URL gambar di CSS dibuat relatif agar aset tetap benar bila aplikasi dipasang di subfolder
+    experimental: {
+        renderBuiltUrl(filename, { hostType }) {
+            return hostType === 'css' ? { relative: true } : undefined;
+        },
+    },
 });
