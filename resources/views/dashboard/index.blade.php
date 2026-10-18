@@ -49,8 +49,13 @@
             @foreach($kepatuhan as $k)
                 @php $p = $k['total'] ? $k['masuk'] / $k['total'] * 100 : 0; @endphp
                 <li>
-                    <div class="flex justify-between text-xs"><span class="font-medium">Satgas Wilayah {{ $k['kode'] }}</span><span class="text-basalt-soft">{{ $k['masuk'] }}/{{ $k['total'] }}</span></div>
-                    <div class="mt-1 h-1.5 rounded-full bg-savana-deep"><div class="h-1.5 rounded-full bg-saluran-500" style="width: {{ $p }}%"></div></div>
+                    <div class="flex items-baseline justify-between gap-2 text-xs">
+                        <span class="font-medium">{{ $k['kode'] ? 'Satgas Wilayah '.$k['kode'] : 'Belum masuk Satgas' }}</span>
+                        <span class="shrink-0 tabular-nums text-basalt-soft">{{ $k['masuk'] }}/{{ $k['total'] }}</span>
+                    </div>
+                    @if($k['cakupan'])<p class="text-[11px] leading-snug text-basalt-soft">{{ $k['cakupan'] }}</p>@endif
+                    <p class="text-[11px] leading-snug text-basalt-mute">{{ $k['kabupaten'] }}</p>
+                    <div class="mt-1 h-1.5 rounded-full bg-savana-deep"><div class="h-1.5 rounded-full {{ $k['kode'] ? 'bg-saluran-500' : 'bg-basalt-mute' }}" style="width: {{ $p }}%"></div></div>
                 </li>
             @endforeach
         </ul>

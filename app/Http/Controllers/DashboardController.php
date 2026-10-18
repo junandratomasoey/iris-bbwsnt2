@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Kejadian;
+use App\Models\Kabupaten;
 use App\Models\LaporanHarian;
 use App\Models\SubDaerahIrigasi;
 use App\Models\WilayahSatgas;
@@ -47,13 +48,18 @@ class DashboardController extends Controller
         $kritis->each(fn ($x) => $x['laporan']->load('subDaerahIrigasi.daerahIrigasi:id,nama', 'subDaerahIrigasi.petugas:id,name,no_hp', 'user:id,name,no_hp'));
 
         // kepatuhan lapor per Satgas
-        $kepatuhan = WilayahSatgas::orderBy('id')->get()->map(function ($w) use ($hari, $subIds) {
-            $ids = SubDaerahIrigasi::whereHas('daerahIrigasi.kabupaten', fn ($k) => $k->where('wilayah_satgas_id', $w->id))
+        // kepatuhan lapor per Satgas (+ kabupaten yang belum masuk Satgas, agar jumlahnya sama dengan total)
+        $hitungKepatuhan = function (?WilayahSatgas $w) use ($hari, $subIds) {
+            $kab = Kabupaten::where('wilayah_satgas_id', $w?->id)->whereHas('daerahIrigasi')->orderBy('nama')->pluck('nama');
+            $ids = SubDaerahIrigasi::whereHas('daerahIrigasi.kabupaten', fn ($k) => $k->where('wilayah_satgas_id', $w?->id))
                 ->when($subIds !== null, fn ($q) => $q->whereIn('id', $subIds))->pluck('id');
             $masuk = $ids->isEmpty() ? 0 : LaporanHarian::whereDate('tanggal', $hari)->whereIn('sub_daerah_irigasi_id', $ids)->count();
 
-            return ['kode' => $w->kode, 'cakupan' => $w->cakupan, 'total' => $ids->count(), 'masuk' => $masuk];
-        })->filter(fn ($w) => $w['total'] > 0);
+            return ['kode' => $w?->kode, 'cakupan' => $w?->cakupan, 'kabupaten' => $kab->implode(', '), 'total' => $ids->count(), 'masuk' => $masuk];
+        };
+        $kepatuhan = WilayahSatgas::orderBy('id')->get()->map($hitungKepatuhan)
+            ->push($hitungKepatuhan(null))
+            ->filter(fn ($w) => $w['total'] > 0)->values();
 
         $menunggu = LaporanHarian::where('status_verifikasi', 'menunggu')
             ->when($subIds !== null, fn ($q) => $q->whereIn('sub_daerah_irigasi_id', $subIds))->count();
