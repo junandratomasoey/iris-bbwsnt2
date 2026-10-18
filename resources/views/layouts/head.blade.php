@@ -5,6 +5,7 @@
 <title>{{ isset($title) ? $title.' — ' : '' }}IRIS BBWS NT II</title>
 <meta name="base-url" content="{{ rtrim(url('/'), '/') }}">
 <meta name="asset-url" content="{{ rtrim(asset(''), '/') }}">
+<meta name="geojson-versi" content="{{ \App\Support\GeojsonVersi::get() }}">
 <link rel="manifest" href="{{ asset('manifest.webmanifest') }}">
 <link rel="icon" href="{{ asset('ikon.svg') }}" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">

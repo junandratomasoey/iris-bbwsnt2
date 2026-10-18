@@ -8,6 +8,7 @@
         ['kejadian.index', 'Kejadian kekeringan', 'kejadian', true],
         ['petugas.index', 'Kontak petugas', 'petugas', ! $u->hasRole(Role::PETUGAS, Role::POB)],
         ['master.daerah-irigasi.index', 'Daerah irigasi', 'di', true],
+        ['master.peta.index', 'Peta batas D.I.', 'peta', ! $u->hasRole(Role::PETUGAS, Role::POB)],
         ['master.jadwal-tanam.index', 'Jadwal tanam', 'jadwal', ! $u->hasRole(Role::PETUGAS, Role::POB)],
         ['master.p3a.index', 'P3A', 'p3a', ! $u->hasRole(Role::PETUGAS, Role::POB)],
         ['pengguna.index', 'Pengguna', 'pengguna', $u->can('kelola-pengguna')],

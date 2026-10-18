@@ -1,5 +1,5 @@
 import L from 'leaflet';
-import { ASSET, BASE } from './base';
+import { ASSET, BASE, GEOJSON_VERSI } from './base';
 
 const BATAS_NTT = [[-11.2, 118.8], [-8.0, 125.3]];
 const fmt = (v, d = 0) => (v === null || v === undefined || v === '') ? '–'
@@ -141,7 +141,7 @@ export function createMap(opsi) {
 
             await Promise.all(['fungsional', 'baku', 'potensial'].map(async (n) => {
                 try {
-                    const r = await fetch(`${ASSET}/geojson/${n}.geojson`);
+                    const r = await fetch(`${ASSET}/geojson/${n}.geojson?v=${GEOJSON_VERSI}`);
                     geo[n] = await r.json();
                 } catch (e) { geo[n] = null; }
             }));

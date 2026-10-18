@@ -8,6 +8,7 @@ use App\Http\Controllers\LaporanHarianController;
 use App\Http\Controllers\Master\DaerahIrigasiController;
 use App\Http\Controllers\Master\JadwalTanamController;
 use App\Http\Controllers\Master\P3aController;
+use App\Http\Controllers\Master\PetaDiController;
 use App\Http\Controllers\Master\SubDaerahIrigasiController;
 use App\Http\Controllers\PenggunaController;
 use App\Http\Controllers\PetaController;
@@ -51,6 +52,11 @@ Route::middleware(['auth', 'siap'])->group(function () {
             ->parameters(['daerah-irigasi' => 'di', 'sub' => 'sub'])->except(['index', 'show'])->shallow();
         Route::resource('jadwal-tanam', JadwalTanamController::class)->parameters(['jadwal-tanam' => 'jadwal'])->except(['show']);
         Route::resource('p3a', P3aController::class)->except(['show']);
+        Route::get('peta/import', [PetaDiController::class, 'importForm'])->name('peta.import');
+        Route::post('peta/import', [PetaDiController::class, 'import'])->name('peta.import.store');
+        Route::get('peta/unduh', [PetaDiController::class, 'unduh'])->name('peta.unduh');
+        Route::post('peta/bangun-ulang', [PetaDiController::class, 'bangunUlang'])->name('peta.bangun-ulang');
+        Route::resource('peta', PetaDiController::class)->parameters(['peta' => 'peta'])->except(['show']);
     });
 
     Route::middleware('can:kelola-pengguna')->group(function () {

@@ -2,6 +2,7 @@
 <x-layouts.app :title="'D.I. '.$di->nama">
 <x-judul :judul="'D.I. '.$di->nama" :sub="collect([$di->kabupaten?->nama, $di->kabupaten?->wilayahSatgas ? 'Satgas Wilayah '.$di->kabupaten->wilayahSatgas->kode : null, 'Kewenangan '.$di->kewenangan, $di->keterangan])->filter()->implode(' · ')">
     <a href="{{ route('peta') }}" class="btn-ghost"><x-ikon n="peta" class="h-4 w-4"/> Peta</a>
+    <a href="{{ route('master.peta.index', ['di' => $di->id]) }}" class="btn-ghost"><x-ikon n="di" class="h-4 w-4"/> Batas di peta</a>
     @if($kelola)<a href="{{ route('master.daerah-irigasi.edit', $di) }}" class="btn-ghost"><x-ikon n="edit" class="h-4 w-4"/> Ubah</a>@endif
 </x-judul>
 

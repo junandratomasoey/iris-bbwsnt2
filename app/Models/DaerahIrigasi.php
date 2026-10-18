@@ -52,6 +52,11 @@ class DaerahIrigasi extends Model
         return $this->hasMany(User::class);
     }
 
+    public function peta(): HasMany
+    {
+        return $this->hasMany(PetaDi::class);
+    }
+
     public function laporanHarian(): HasManyThrough
     {
         return $this->hasManyThrough(LaporanHarian::class, SubDaerahIrigasi::class);

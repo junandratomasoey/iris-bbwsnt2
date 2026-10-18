@@ -24,7 +24,16 @@ trait LogsActivity
         if (app()->runningInConsole() && ! app()->runningUnitTests()) {
             return; // seeder & artisan tidak dicatat
         }
-        $data = collect($data)->except(['password', 'remember_token'])->all();
+        $kecuali = array_merge(['password', 'remember_token'], $this->tidakDicatat ?? []);
+        $data = collect($data)->except($kecuali)->all();
+        foreach (['baru', 'lama'] as $k) {
+            if (isset($data[$k])) {
+                $data[$k] = collect($data[$k])->except($kecuali)->all();
+            }
+        }
+        if (($data['baru'] ?? null) === []) {
+            $data['baru'] = ['geometri' => '(batas peta diubah)'];
+        }
         ActivityLog::create([
             'user_id' => Auth::id(),
             'action' => $aksi,
