@@ -29,8 +29,8 @@
 </header>
 
 <div x-show="nav" x-cloak class="fixed inset-0 z-40 bg-basalt/50 lg:hidden" @click="nav = false"></div>
-<aside :class="nav ? 'translate-x-0' : '-translate-x-full'"
-       class="fixed inset-y-0 left-0 z-50 flex w-64 flex-col bg-saluran-600 text-white transition-transform lg:translate-x-0">
+<aside :class="nav && '!translate-x-0'"
+       class="fixed inset-y-0 left-0 z-50 flex w-64 -translate-x-full flex-col bg-saluran-600 text-white transition-transform lg:translate-x-0">
     <div class="flex items-center justify-between px-4 py-4">
         <a href="{{ route('dashboard') }}"><x-logo /></a>
         <button type="button" class="rounded p-1.5 hover:bg-saluran-700 lg:hidden" @click="nav = false" aria-label="Tutup menu"><x-ikon n="tutup"/></button>

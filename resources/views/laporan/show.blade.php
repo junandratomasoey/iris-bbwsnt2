@@ -81,9 +81,29 @@
             @else
                 <p class="text-basalt-soft">Belum diverifikasi.</p>
             @endif
+            @cannot('verify', $laporan)
+                @if($laporan->status_verifikasi !== 'disetujui')
+                    @php $calon = $laporan->calonVerifikator(); @endphp
+                    <div class="mt-4 border-t border-savana-line pt-3">
+                        <p class="font-medium">{{ $laporan->status_verifikasi === 'perbaikan' ? 'Setelah diperbaiki, laporan diperiksa lagi oleh:' : 'Akan diverifikasi oleh salah satu:' }}</p>
+                        <ul class="mt-2 space-y-1.5">
+                            @forelse($calon->take(6) as $v)
+                                <li class="flex items-center justify-between gap-2">
+                                    <span>{{ $v->name }} <span class="text-xs text-basalt-mute">{{ $v->roleLabel() }}{{ $v->jabatan && $v->jabatan !== $v->roleLabel() ? ' · '.$v->jabatan : '' }}</span></span>
+                                    @if($v->waLink())<a href="{{ $v->waLink('Selamat siang, mohon verifikasi laporan IRIS '.$s->nama.' tanggal '.$laporan->tanggal->format('d/m/Y').': '.route('laporan.show', $laporan)) }}" target="_blank" rel="noopener" class="shrink-0 text-xs font-semibold text-[#1f8f4e]">WA</a>@endif
+                                </li>
+                            @empty
+                                <li class="text-basalt-soft">Belum ada Manager/Koordinator untuk wilayah ini. Hubungi Admin OP.</li>
+                            @endforelse
+                        </ul>
+                        @if($laporan->status_verifikasi === 'menunggu')<p class="mt-2 text-xs text-basalt-mute">Laporan masih bisa diubah sampai disetujui.</p>@endif
+                    </div>
+                @endif
+            @endcannot
             @can('verify', $laporan)
                 <form method="POST" action="{{ route('laporan.verifikasi', $laporan) }}" class="mt-4 space-y-3 border-t border-savana-line pt-4" x-data="{ k: 'disetujui' }">
                     @csrf
+                    <p class="font-medium">{{ $laporan->status_verifikasi === 'menunggu' ? 'Periksa angka & foto, lalu putuskan:' : 'Ubah keputusan:' }}</p>
                     <div class="grid grid-cols-2 gap-2">
                         <label class="cursor-pointer"><input type="radio" name="keputusan" value="disetujui" x-model="k" class="peer sr-only"><span class="block rounded-md border border-savana-line py-2 text-center font-medium peer-checked:border-status-aman peer-checked:bg-[#E4F0DD]">Setujui</span></label>
                         <label class="cursor-pointer"><input type="radio" name="keputusan" value="perbaikan" x-model="k" class="peer sr-only"><span class="block rounded-md border border-savana-line py-2 text-center font-medium peer-checked:border-status-kritis peer-checked:bg-[#F6D9D7]">Minta perbaikan</span></label>

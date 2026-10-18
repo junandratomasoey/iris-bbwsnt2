@@ -39,6 +39,7 @@ Route::middleware(['auth', 'siap'])->group(function () {
     Route::get('/api/di/{di}', [PetaController::class, 'detailInternal'])->name('api.di');
 
     Route::get('/laporan/ekspor', [LaporanHarianController::class, 'ekspor'])->name('laporan.ekspor');
+    Route::post('/laporan/verifikasi-massal', [LaporanHarianController::class, 'verifikasiMassal'])->name('laporan.verifikasi-massal');
     Route::post('/laporan/{laporan}/verifikasi', [LaporanHarianController::class, 'verifikasi'])->name('laporan.verifikasi');
     Route::delete('/laporan/{laporan}/foto/{foto}', [LaporanHarianController::class, 'hapusFoto'])->name('laporan.foto.destroy');
     Route::resource('laporan', LaporanHarianController::class)->parameters(['laporan' => 'laporan']);

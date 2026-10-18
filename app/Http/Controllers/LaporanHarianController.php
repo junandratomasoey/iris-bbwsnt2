@@ -30,7 +30,10 @@ class LaporanHarianController extends Controller
         $diList = DaerahIrigasi::when($user->subIdsTerjangkau() !== null, fn ($q) => $q->whereHas('subDaerahIrigasi', fn ($s) => $s->whereIn('id', $user->subIdsTerjangkau())))
             ->orderBy('nama')->get(['id', 'nama']);
 
-        return view('laporan.index', compact('laporan', 'diList'));
+        $menunggu = $user->can('verifikasi') ? LaporanHarian::where('status_verifikasi', 'menunggu')
+            ->when($user->subIdsTerjangkau() !== null, fn ($q) => $q->whereIn('sub_daerah_irigasi_id', $user->subIdsTerjangkau()))->count() : 0;
+
+        return view('laporan.index', compact('laporan', 'diList', 'menunggu'));
     }
 
     public function create(Request $request)
@@ -147,6 +150,25 @@ class LaporanHarianController extends Controller
 
         return ($lanjut ? redirect()->route('laporan.show', $lanjut) : back())
             ->with('ok', $data['keputusan'] === 'disetujui' ? 'Laporan disetujui.' : 'Laporan dikembalikan untuk perbaikan.');
+    }
+
+    /** Setujui beberapa laporan sekaligus dari daftar. Hanya yang masih "menunggu" dan dalam wilayah verifikator. */
+    public function verifikasiMassal(Request $request)
+    {
+        abort_unless($request->user()->can('verifikasi'), 403);
+        $data = $request->validate(['ids' => ['required', 'array', 'max:200'], 'ids.*' => ['integer']], ['ids.required' => 'Pilih minimal satu laporan.']);
+
+        $n = 0;
+        LaporanHarian::whereIn('id', $data['ids'])->where('status_verifikasi', 'menunggu')->get()
+            ->each(function (LaporanHarian $l) use ($request, &$n) {
+                if ($request->user()->cannot('verify', $l)) {
+                    return;
+                }
+                $l->update(['status_verifikasi' => 'disetujui', 'catatan_verifikasi' => null, 'diverifikasi_oleh' => $request->user()->id, 'diverifikasi_pada' => now()]);
+                $n++;
+            });
+
+        return back()->with('ok', $n ? "$n laporan disetujui." : 'Tidak ada laporan yang bisa disetujui.');
     }
 
     public function ekspor(Request $request): StreamedResponse

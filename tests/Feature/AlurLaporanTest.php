@@ -166,4 +166,30 @@ class AlurLaporanTest extends TestCase
             ->assertSessionHasNoErrors();
         $this->assertEqualsWithDelta(-10.1458321, $l->fresh()->lat, 1e-7);
     }
+
+    public function test_petugas_melihat_siapa_verifikator_dan_manager_setujui_massal(): void
+    {
+        $diA = $this->subA->daerahIrigasi;
+        $manager = User::create(['name' => 'Manager Oesao', 'username' => 'mgr', 'no_hp' => '081299990000', 'password' => 'x', 'role' => Role::MANAGER, 'must_change_password' => false, 'daerah_irigasi_id' => $diA->id]);
+        $koor = User::create(['name' => 'Koordinator Timor', 'username' => 'koor', 'password' => 'x', 'role' => Role::KOORDINATOR, 'must_change_password' => false, 'wilayah_satgas_id' => $diA->kabupaten->wilayah_satgas_id]);
+
+        $buat = fn ($sub, $tgl) => LaporanHarian::create(['tanggal' => $tgl, 'sub_daerah_irigasi_id' => $sub->id, 'user_id' => $this->petugas->id,
+            'debit_intake_lps' => 10, 'tma_cm' => 10, 'kondisi_saluran' => 'normal']);
+        $a1 = $buat($this->subA, today());
+        $a2 = $buat($this->subA, today()->subDay());
+        $b1 = $buat($this->subB, today());
+
+        $this->assertSame(['Manager Oesao', 'Koordinator Timor'], $a1->calonVerifikator()->pluck('name')->all());
+        $this->actingAs($this->petugas)->get(route('laporan.show', $a1))->assertOk()
+            ->assertSee('Akan diverifikasi oleh salah satu')->assertSee('Manager Oesao')->assertDontSee('Simpan keputusan');
+
+        $this->actingAs($this->petugas)->post(route('laporan.verifikasi-massal'), ['ids' => [$a1->id]])->assertForbidden();
+
+        $this->actingAs($manager)->get(route('laporan.index'))->assertOk()->assertSee('menunggu verifikasi Anda')->assertSee('Setujui terpilih');
+        $this->actingAs($manager)->post(route('laporan.verifikasi-massal'), ['ids' => [$a1->id, $a2->id, $b1->id]])
+            ->assertSessionHas('ok', '2 laporan disetujui.');                                   // laporan D.I. lain dilewati
+        $this->assertSame('disetujui', $a1->fresh()->status_verifikasi);
+        $this->assertSame($manager->id, $a2->fresh()->diverifikasi_oleh);
+        $this->assertSame('menunggu', $b1->fresh()->status_verifikasi);
+    }
 }

@@ -62,6 +62,26 @@ class LaporanHarian extends Model
         return StatusKondisi::dariLaporan($this);
     }
 
+    /**
+     * Siapa yang memverifikasi laporan ini: Manager D.I. dan Koordinator Satgas wilayahnya.
+     * Bila keduanya belum ada, Admin OP.
+     *
+     * @return \Illuminate\Support\Collection<int, User>
+     */
+    public function calonVerifikator()
+    {
+        $sub = $this->subDaerahIrigasi()->with('daerahIrigasi.kabupaten:id,wilayah_satgas_id')->first();
+        $diId = $sub?->daerah_irigasi_id;
+        $satgasId = $sub?->daerahIrigasi?->kabupaten?->wilayah_satgas_id;
+
+        $orang = User::aktif()->where(fn ($q) => $q
+            ->where(fn ($m) => $m->where('role', \App\Support\Role::MANAGER)->where('daerah_irigasi_id', $diId))
+            ->when($satgasId, fn ($w) => $w->orWhere(fn ($k) => $k->where('role', \App\Support\Role::KOORDINATOR)->where('wilayah_satgas_id', $satgasId))))
+            ->orderByRaw("CASE role WHEN 'manager' THEN 0 ELSE 1 END")->orderBy('name')->get();
+
+        return $orang->isNotEmpty() ? $orang : User::aktif()->where('role', \App\Support\Role::ADMIN_OP)->orderBy('name')->get();
+    }
+
     public function terkunci(): bool
     {
         return $this->status_verifikasi === 'disetujui';
