@@ -50,6 +50,7 @@
             </a>
         @endforeach
     </nav>
+    <x-pasang-aplikasi gaya="menu" class="px-3 pb-2"/>
     <div class="border-t border-saluran-700 px-4 py-3 text-sm">
         <p class="font-semibold">{{ $u->name }}</p>
         <p class="text-xs text-saluran-100">{{ $u->roleLabel() }}@if($u->daerahIrigasi) · D.I. {{ $u->daerahIrigasi->nama }}@endif</p>

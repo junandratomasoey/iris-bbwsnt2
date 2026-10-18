@@ -1,14 +1,24 @@
 {
+  "id": "./",
   "name": "IRIS BBWS Nusa Tenggara II",
   "short_name": "IRIS NT II",
   "description": "Laporan harian kondisi irigasi dan kekeringan sawah di Nusa Tenggara Timur",
-  "start_url": "dashboard",
+  "start_url": "dashboard?sumber=aplikasi",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#F3F5F2",
+  "orientation": "any",
+  "background_color": "#1F3368",
   "theme_color": "#0F5E6E",
   "lang": "id",
+  "categories": ["government", "productivity", "utilities"],
   "icons": [
-    { "src": "ikon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Isi laporan harian", "short_name": "Lapor", "url": "laporan/create", "icons": [{ "src": "icon-192.png", "sizes": "192x192" }] },
+    { "name": "Peta kondisi", "short_name": "Peta", "url": "peta", "icons": [{ "src": "icon-192.png", "sizes": "192x192" }] }
   ]
 }

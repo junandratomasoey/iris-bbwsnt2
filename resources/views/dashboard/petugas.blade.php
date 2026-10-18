@@ -1,6 +1,8 @@
 <x-layouts.app title="Beranda petugas">
 <x-judul :judul="'Halo, '.\Illuminate\Support\Str::of(auth()->user()->name)->words(2, '')" :sub="today()->translatedFormat('l, d F Y')"/>
 
+<x-pasang-aplikasi gaya="kartu" class="mb-5"/>
+
 <section aria-labelledby="judul-tugas">
     <h2 id="judul-tugas" class="mb-2 text-lg font-semibold">Laporan hari ini</h2>
     @if($subs->isEmpty())

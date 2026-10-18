@@ -28,6 +28,7 @@
                 <button class="btn-primary w-full py-2.5">Masuk</button>
             </form>
             <p class="mt-6 text-sm text-basalt-soft">Lupa password? Hubungi Admin OP BBWS NT II untuk reset.</p>
+            <x-pasang-aplikasi gaya="kartu" class="mt-6"/>
             <a href="{{ route('beranda') }}" class="mt-2 inline-block text-sm font-medium text-saluran-600 lg:hidden">Lihat peta publik</a>
         </div>
     </section>
