@@ -160,7 +160,8 @@ export function createMap(opsi) {
         data: null,
         memuat: true,
         galat: null,
-        panel: window.innerWidth >= 1024,
+        // layar lebar: ingat pilihan buka/tutup terakhir; HP: tertutup agar peta terlihat
+        panel: window.innerWidth >= 1024 && (() => { try { return localStorage.getItem('iris-panel-peta') !== 'tutup'; } catch (e) { return true; } })(),
         tab: 'di',
         cari: '',
         statusKejadian: '',
@@ -241,6 +242,11 @@ export function createMap(opsi) {
                 if (this.detailId) this.bukaDetail(this.detailId, { terbang: false });
             };
             ['periode', 'dari', 'sampai', 'warna'].forEach((k) => this.$watch(k, muatUlang));
+            // panel dibuka/ditutup → ukuran peta berubah (layar lebar), hitung ulang
+            this.$watch('panel', (buka) => {
+                if (window.innerWidth >= 1024) { try { localStorage.setItem('iris-panel-peta', buka ? 'buka' : 'tutup'); } catch (e) {} }
+                this.$nextTick(() => map.invalidateSize({ pan: false }));
+            });
             if (this.periode === 'rentang' && !this.dari) this.dari = this.sampai;
             ['kabupaten', 'satgas', 'status', 'lapis', 'statusKejadian'].forEach((k) => this.$watch(k, () => this.gambar(), { deep: true }));
             this.$watch('kabupaten', () => this.gayaWilayah());

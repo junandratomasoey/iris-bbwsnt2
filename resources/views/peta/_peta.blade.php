@@ -15,7 +15,7 @@
                     <p class="text-xs text-basalt-soft" x-show="!modeRekap">Dari laporan petugas 3 hari terakhir. Klik D.I. di peta atau daftar untuk foto, infrastruktur, dan riwayatnya.</p>
                     <p class="text-xs text-basalt-soft" x-show="modeRekap" x-cloak>Rekap <b x-text="data?.periode?.label"></b> (<span x-text="data?.periode?.keterangan"></span>). Warna = status <span x-text="warna"></span>. Klik D.I. untuk riwayat & foto.</p>
                 </div>
-                <button type="button" class="rounded p-1 hover:bg-savana lg:hidden" @click="panel = false" aria-label="Tutup panel"><x-ikon n="tutup"/></button>
+                <button type="button" class="rounded p-1 hover:bg-savana" @click="panel = false" aria-label="Tutup panel" title="Tutup panel"><x-ikon n="tutup"/></button>
             </div>
 
             {{-- papan duga: proporsi D.I. per status --}}
@@ -167,6 +167,9 @@
     </aside>
 
     <div class="relative min-w-0 flex-1">
+        <button type="button" x-show="panel" x-cloak @click="panel = false" class="absolute left-0 top-1/2 z-[450] hidden h-14 w-5 -translate-y-1/2 items-center justify-center rounded-r-md border border-l-0 border-savana-line bg-white text-basalt-soft shadow hover:text-saluran-700 lg:flex" aria-label="Sembunyikan panel" title="Sembunyikan panel">
+            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+        </button>
         <div x-ref="peta" class="absolute inset-0 z-0" role="application" aria-label="Peta Daerah Irigasi NTT"></div>
         <button type="button" x-show="!panel" @click="panel = true" class="absolute left-3 top-3 z-[400] btn-ghost max-w-[60vw] shadow"><x-ikon n="filter" class="h-4 w-4 shrink-0"/> <span class="truncate" x-text="diPilih ? 'Detail D.I. ' + diPilih.nama : 'Daftar & filter'">Daftar &amp; filter</span></button>
         <div x-show="memuat" class="absolute left-1/2 top-3 z-[400] -translate-x-1/2 rounded-full bg-white px-3 py-1 text-xs font-medium shadow">Memuat data…</div>

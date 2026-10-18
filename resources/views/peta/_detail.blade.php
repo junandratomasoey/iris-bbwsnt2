@@ -3,7 +3,7 @@
     <button type="button" @click="tutupDetail()" class="flex items-center gap-1 rounded px-2 py-1.5 text-sm font-semibold text-saluran-700 hover:bg-savana">
         <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg> Semua D.I.
     </button>
-    <button type="button" @click="panel = false" class="rounded px-2 py-1.5 text-sm font-medium text-basalt-soft hover:bg-savana lg:hidden">Lihat peta</button>
+    <button type="button" @click="panel = false" class="flex items-center gap-1 rounded px-2 py-1.5 text-sm font-medium text-basalt-soft hover:bg-savana" title="Sembunyikan panel"><span class="lg:hidden">Lihat peta</span><span class="hidden lg:inline">Sembunyikan</span><x-ikon n="tutup" class="h-4 w-4"/></button>
 </div>
 
 <template x-if="diPilih">
