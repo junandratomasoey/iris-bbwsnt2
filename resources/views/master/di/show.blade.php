@@ -2,7 +2,7 @@
 <x-layouts.app :title="'D.I. '.$di->nama">
 <x-judul :judul="'D.I. '.$di->nama" :sub="collect([$di->kabupaten?->nama, $di->kabupaten?->wilayahSatgas ? 'Satgas Wilayah '.$di->kabupaten->wilayahSatgas->kode : null, 'Kewenangan '.$di->kewenangan, $di->keterangan])->filter()->implode(' · ')">
     <a href="{{ route('peta') }}" class="btn-ghost"><x-ikon n="peta" class="h-4 w-4"/> Peta</a>
-    <a href="{{ route('master.peta.index', ['di' => $di->id]) }}" class="btn-ghost"><x-ikon n="di" class="h-4 w-4"/> Batas di peta</a>
+    @can('lihat-master')<a href="{{ route('master.peta.index', ['di' => $di->id]) }}" class="btn-ghost"><x-ikon n="di" class="h-4 w-4"/> Batas di peta</a>@endcan
     @if($kelola)<a href="{{ route('master.daerah-irigasi.edit', $di) }}" class="btn-ghost"><x-ikon n="edit" class="h-4 w-4"/> Ubah</a>@endif
 </x-judul>
 
@@ -128,12 +128,29 @@
     </section>
     <section class="panel p-5">
         <div class="flex items-baseline justify-between"><h2 class="text-lg font-semibold">Infrastruktur ({{ $di->bangunan->count() }})</h2>
-            <span class="flex gap-3 text-sm font-medium">@if($kelola)<a href="{{ route('master.bangunan.create', ['di' => $di->id]) }}" class="text-saluran-600">Tambah</a>@endif<a href="{{ route('master.bangunan.index', ['di' => $di->id]) }}" class="text-saluran-600">Semua</a></span></div>
+            <span class="flex gap-3 text-sm font-medium">@if($kelola)<a href="{{ route('master.bangunan.create', ['di' => $di->id]) }}" class="text-saluran-600">Tambah</a>@endif @can('lihat-master')<a href="{{ route('master.bangunan.index', ['di' => $di->id]) }}" class="text-saluran-600">Semua</a>@endcan</span></div>
         <ul class="mt-2 divide-y divide-savana-line text-sm">
             @foreach($di->bangunan->sortBy('nama') as $b)<li class="flex items-center justify-between gap-2 py-1.5">
                 <span>@if($kelola)<a href="{{ route('master.bangunan.edit', $b) }}" class="hover:underline">{{ $b->nama }}</a>@else{{ $b->nama }}@endif <span class="text-xs text-basalt-mute">{{ $b->jenis_label }}</span></span>
                 <span class="inline-flex shrink-0 items-center gap-1.5 text-xs"><span class="h-2 w-2 rounded-full" style="background: {{ $b->warna_kondisi }}"></span>{{ $b->kondisi_label }}</span></li>@endforeach
         </ul>
+    </section>
+    <section class="panel p-5">
+        <div class="flex items-baseline justify-between"><h2 class="text-lg font-semibold">Pintu air ({{ $pintu->count() }})</h2>
+            <span class="flex gap-3 text-sm font-medium">@if(auth()->user()->bolehKelolaPintu($di->id))<a href="{{ route('master.pintu-air.create', ['di' => $di->id]) }}" class="text-saluran-600">Tambah</a>@endif <a href="{{ route('pintu.index', ['di' => $di->id]) }}" class="text-saluran-600">Pemantauan</a></span></div>
+        @if($pintu->isEmpty())
+            <p class="mt-2 text-sm text-basalt-soft">Belum ada pintu air.{{ $skemaN ? '' : ' Skema jaringan juga belum diunggah.' }}</p>
+        @else
+            @php $h = app(\App\Services\PintuService::class)->hitung($pintu); @endphp
+            <p class="mt-2 text-sm">{{ $h['dibaca'] }}/{{ $h['total'] }} dibaca sejak Senin · <span class="text-[#8A3510]">{{ $h['kurang'] }} kurang/rendah</span> · <span class="text-[#1B4F7A]">{{ $h['lebih'] }} berlebih/tinggi</span></p>
+            <ul class="mt-2 max-h-60 divide-y divide-savana-line overflow-y-auto text-sm">
+                @foreach($pintu as $p)
+                    <li class="flex items-center justify-between gap-2 py-1.5"><a href="{{ route('pintu.show', $p) }}" class="hover:underline"><b>{{ $p->kode }}</b> <span class="text-xs text-basalt-mute">{{ $p->subDaerahIrigasi?->nama ?? 'Tingkat D.I.' }}</span></a>
+                        <span class="shrink-0 text-xs">{{ $p->terakhir?->debit_lps !== null ? angka_r($p->terakhir->debit_lps).' L/dt' : '–' }} <x-status-pintu :s="$p->status_debit"/></span></li>
+                @endforeach
+            </ul>
+            <p class="mt-2 text-xs text-basalt-mute">{{ $skemaN }} file skema jaringan.</p>
+        @endif
     </section>
     <section class="panel p-5">
         <h2 class="text-lg font-semibold">Petugas ({{ $di->petugas->count() }})</h2>

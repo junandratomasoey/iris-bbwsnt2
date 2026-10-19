@@ -19,6 +19,7 @@ class PetaDiController extends Controller
 
     public function index(Request $request)
     {
+        $this->authorize('lihat-master');
         $lapisan = $request->input('lapisan', 'fungsional');
         abort_unless(isset(PetaDi::LAPISAN[$lapisan]), 404);
 

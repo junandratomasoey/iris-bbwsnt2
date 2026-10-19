@@ -37,7 +37,10 @@ class DaerahIrigasiController extends Controller
             ->selectRaw('tanggal, sum(debit_intake_lps) debit, sum(luas_kering_ha) kering, sum(luas_tanam_ha) tanam, count(*) n')
             ->groupBy('tanggal')->orderBy('tanggal')->get();
 
-        return view('master.di.show', compact('di', 'ring', 'laporanTerkini', 'p3a', 'tren'));
+        $pintu = app(\App\Services\PintuService::class)->daftar(null, $di->id, 2);
+        $skemaN = $di->skemaJaringan()->count();
+
+        return view('master.di.show', compact('di', 'ring', 'laporanTerkini', 'p3a', 'tren', 'pintu', 'skemaN'));
     }
 
     public function create()

@@ -13,6 +13,7 @@ class P3aController extends Controller
 {
     public function index(Request $request)
     {
+        $this->authorize('lihat-master');
         $p3a = P3a::with('kabupaten:id,nama', 'daerahIrigasi:id,nama')
             ->when($request->filled('kabupaten'), fn ($q) => $q->where('kabupaten_id', $request->integer('kabupaten')))
             ->when($request->filled('q'), fn ($q) => $q->where(fn ($w) => $w->where('nama', 'like', '%'.$request->q.'%')->orWhere('ketua', 'like', '%'.$request->q.'%')))

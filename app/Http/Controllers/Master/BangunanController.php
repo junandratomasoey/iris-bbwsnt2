@@ -18,6 +18,7 @@ class BangunanController extends Controller
 
     public function index(Request $request)
     {
+        $this->authorize('lihat-master');
         $bangunan = Bangunan::with('daerahIrigasi:id,nama', 'subDaerahIrigasi:id,nama')->withCount('foto')
             ->when($request->filled('di'), fn ($q) => $q->where('daerah_irigasi_id', $request->integer('di')))
             ->when($request->filled('jenis'), fn ($q) => $q->where('jenis', $request->jenis))

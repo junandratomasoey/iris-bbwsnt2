@@ -7,6 +7,7 @@ import { pickLocation } from './pick-location';
 import { petaEditor } from './peta-editor';
 import { pasangAplikasi } from './pasang-aplikasi';
 import { unggahFoto } from './foto';
+import { formPintu } from './pintu-form';
 import { ASSET } from './base';
 
 window.Alpine = Alpine;
@@ -16,6 +17,7 @@ Alpine.data('pickLocation', pickLocation);
 Alpine.data('petaEditor', petaEditor);
 Alpine.data('pasangAplikasi', pasangAplikasi);
 Alpine.data('unggahFoto', unggahFoto);
+Alpine.data('formPintu', formPintu);
 Alpine.start();
 
 if ('serviceWorker' in navigator && window.location.protocol === 'https:') {

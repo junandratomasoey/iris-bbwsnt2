@@ -39,6 +39,11 @@ class SubDaerahIrigasi extends Model
         return $this->hasMany(Bangunan::class);
     }
 
+    public function pintuAir(): HasMany
+    {
+        return $this->hasMany(PintuAir::class);
+    }
+
     public function laporanHarian(): HasMany
     {
         return $this->hasMany(LaporanHarian::class);

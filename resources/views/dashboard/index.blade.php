@@ -95,6 +95,22 @@
     </section>
 </div>
 
+@if($pintu['total'])
+<section class="panel mt-5 p-5">
+    <div class="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 class="text-lg font-semibold">Pintu air minggu ini</h2>
+        <a href="{{ route('pintu.index') }}" class="text-sm font-medium text-saluran-600">Lihat per D.I.</a>
+    </div>
+    <dl class="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div><dt class="text-xs text-basalt-soft">Sudah dibaca sejak Senin</dt><dd class="font-gauge text-2xl font-semibold">{{ $pintu['dibaca'] }}<span class="text-base text-basalt-mute"> / {{ $pintu['total'] }}</span></dd></div>
+        <div><dt class="text-xs text-basalt-soft">Belum dibaca</dt><dd class="font-gauge text-2xl font-semibold {{ $pintu['belum'] ? 'text-[#8A3510]' : '' }}">{{ $pintu['belum'] }}</dd></div>
+        <div><dt class="text-xs text-basalt-soft">Debit kurang / TMA rendah</dt><dd class="font-gauge text-2xl font-semibold {{ $pintu['kurang'] ? 'text-[#8A3510]' : '' }}">{{ $pintu['kurang'] }}</dd></div>
+        <div><dt class="text-xs text-basalt-soft">Debit berlebih / TMA tinggi</dt><dd class="font-gauge text-2xl font-semibold {{ $pintu['lebih'] ? 'text-[#1B4F7A]' : '' }}">{{ $pintu['lebih'] }}</dd></div>
+    </dl>
+    <p class="mt-2 text-xs text-basalt-mute">Status dari pembacaan terakhir tiap pintu terhadap rentang normal yang diisi per pintu.</p>
+</section>
+@endif
+
 <section class="panel mt-5 overflow-hidden">
     <div class="flex flex-wrap items-baseline justify-between gap-2 p-5 pb-3">
         <h2 class="text-lg font-semibold">Sub-D.I. yang perlu perhatian</h2>

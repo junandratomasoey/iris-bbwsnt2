@@ -26,6 +26,19 @@ if (! function_exists('angka')) {
     }
 }
 
+if (! function_exists('angka_r')) {
+    /** Angka ringkas: desimal hanya bila perlu (maks 2), mis. 120 → "120", 12,5 → "12,5". */
+    function angka_r($v): string
+    {
+        if ($v === null || $v === '') {
+            return '–';
+        }
+        $s = number_format((float) $v, 2, ',', '.');
+
+        return str_contains($s, ',') ? rtrim(rtrim($s, '0'), ',') : $s;
+    }
+}
+
 if (! function_exists('normalisasi_hp')) {
     function normalisasi_hp(?string $hp): ?string
     {

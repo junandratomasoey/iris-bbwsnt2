@@ -30,7 +30,11 @@ class DaerahIrigasi extends Model
 
     protected static function booted(): void
     {
-        static::deleting(fn (DaerahIrigasi $di) => $di->foto()->get()->each->delete());
+        static::deleting(function (DaerahIrigasi $di) {
+            $di->foto()->get()->each->delete();
+            $di->skemaJaringan()->get()->each->delete();
+            SesiPintu::where('daerah_irigasi_id', $di->id)->get()->each->delete();
+        });
     }
 
     public function kabupaten(): BelongsTo
@@ -46,6 +50,16 @@ class DaerahIrigasi extends Model
     public function bangunan(): HasMany
     {
         return $this->hasMany(Bangunan::class);
+    }
+
+    public function pintuAir(): HasMany
+    {
+        return $this->hasMany(PintuAir::class);
+    }
+
+    public function skemaJaringan(): HasMany
+    {
+        return $this->hasMany(SkemaJaringan::class)->latest('id');
     }
 
     public function jadwalTanam(): HasMany

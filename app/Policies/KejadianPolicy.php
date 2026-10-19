@@ -15,12 +15,12 @@ class KejadianPolicy
 
     public function create(User $user): bool
     {
-        return ! $user->hasRole(Role::PIMPINAN);
+        return $user->boleh('lapor-kejadian');
     }
 
     public function update(User $user, Kejadian $k): bool
     {
-        return $user->hasRole(Role::SUPER_ADMIN, Role::ADMIN_OP, Role::KOORDINATOR)
+        return $user->boleh('kelola-kejadian')
             || ($k->user_id === $user->id && $k->status_penanganan === 'Perlu Penanganan');
     }
 
@@ -38,6 +38,6 @@ class KejadianPolicy
     /** Ubah status penanganan & luas tertangani. */
     public function tangani(User $user, Kejadian $k): bool
     {
-        return $user->hasRole(Role::SUPER_ADMIN, Role::ADMIN_OP, Role::KOORDINATOR);
+        return $user->boleh('kelola-kejadian');
     }
 }

@@ -8,6 +8,7 @@ use App\Models\LaporanHarian;
 use App\Models\SubDaerahIrigasi;
 use App\Models\WilayahSatgas;
 use App\Services\KondisiService;
+use App\Services\PintuService;
 use App\Services\RekapService;
 use App\Support\Periode;
 use App\Support\Role;
@@ -29,7 +30,9 @@ class DashboardController extends Controller
             $riwayat = LaporanHarian::with('subDaerahIrigasi:id,nama')->where('user_id', $user->id)
                 ->latest('tanggal')->latest('id')->limit(10)->get();
 
-            return view('dashboard.petugas', compact('subs', 'hariIni', 'riwayat'));
+            $pintu = $user->boleh('isi-pintu') ? app(PintuService::class)->perDi(app(PintuService::class)->daftar($user->subIdsPelaporan('isi-pintu'), null, 2)) : collect();
+
+            return view('dashboard.petugas', compact('subs', 'hariIni', 'riwayat', 'pintu'));
         }
 
         $subIds = $user->subIdsTerjangkau();
@@ -79,8 +82,11 @@ class DashboardController extends Controller
         $kejadian = Kejadian::selectRaw('status_penanganan, count(*) as jumlah, sum(luas_terdampak_ha) as luas, sum(luas_tertangani_ha) as tertangani')
             ->groupBy('status_penanganan')->get()->keyBy('status_penanganan');
 
+        $svcPintu = app(PintuService::class);
+        $pintu = $svcPintu->hitung($svcPintu->daftar($subIds, null, 2));
+
         return view('dashboard.index', compact(
-            'ringkasan', 'perStatus', 'luasPerStatus', 'totalSub', 'laporHariIni', 'kritis', 'kepatuhan', 'menunggu', 'kejadian', 'hari', 'periode'
+            'pintu', 'ringkasan', 'perStatus', 'luasPerStatus', 'totalSub', 'laporHariIni', 'kritis', 'kepatuhan', 'menunggu', 'kejadian', 'hari', 'periode'
         ));
     }
 }

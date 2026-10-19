@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\LogsActivity;
+use App\Support\HakAkses;
 use App\Support\Role;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -60,6 +61,37 @@ class User extends Authenticatable
         return $this->hasMany(LaporanHarian::class);
     }
 
+    public function izinPengguna(): HasMany
+    {
+        return $this->hasMany(IzinPengguna::class);
+    }
+
+    /** @var array<string,bool>|null */
+    private ?array $izinKhususCache = null;
+
+    /** Pengecualian izin orang ini: izin => boleh. */
+    public function izinKhusus(): array
+    {
+        if ($this->izinKhususCache === null) {
+            $this->izinKhususCache = $this->exists
+                ? IzinPengguna::where('user_id', $this->id)->pluck('boleh', 'izin')->map(fn ($b) => (bool) $b)->all()
+                : [];
+        }
+
+        return $this->izinKhususCache;
+    }
+
+    public function lupakanIzin(): void
+    {
+        $this->izinKhususCache = null;
+    }
+
+    /** Apakah user punya izin form/fitur ini (lihat App\Support\Izin). */
+    public function boleh(string $izin): bool
+    {
+        return HakAkses::boleh($this, $izin);
+    }
+
     public function hasRole(string ...$roles): bool
     {
         return in_array($this->role, $roles, true);
@@ -112,13 +144,33 @@ class User extends Authenticatable
         });
     }
 
-    /** Sub-D.I. yang boleh diisi laporannya oleh user. */
-    public function subIdsPelaporan(): ?array
+    /** ID D.I. dalam jangkauan user. null = semua. */
+    public function diIdsTerjangkau(): ?array
     {
-        if ($this->hasRole(...Role::PENGELOLA)) {
+        $subIds = $this->subIdsTerjangkau();
+        if ($subIds === null) {
             return null;
         }
-        if (! $this->hasRole(...Role::PELAPOR)) {
+
+        return once(fn () => SubDaerahIrigasi::whereIn('id', $subIds)->distinct()->pluck('daerah_irigasi_id')
+            ->push($this->daerah_irigasi_id)->filter()->unique()->values()->all());
+    }
+
+    /** Boleh menambah/mengubah pintu air & skema di D.I. ini. */
+    public function bolehKelolaPintu(int $diId): bool
+    {
+        if (! $this->boleh('kelola-pintu')) {
+            return false;
+        }
+        $ids = $this->diIdsTerjangkau();
+
+        return $ids === null || in_array($diId, $ids, true);
+    }
+
+    /** Sub-D.I. yang boleh diisi (laporan harian / pembacaan pintu) oleh user. null = semua. */
+    public function subIdsPelaporan(string $izin = 'lapor'): ?array
+    {
+        if (! $this->boleh($izin)) {
             return [];
         }
 

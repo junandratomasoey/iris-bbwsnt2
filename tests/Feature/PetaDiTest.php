@@ -125,6 +125,9 @@ class PetaDiTest extends TestCase
     public function test_petugas_hanya_bisa_melihat(): void
     {
         $ptg = User::create(['name' => 'PPA', 'username' => 'ppa', 'password' => 'x', 'role' => Role::PETUGAS, 'must_change_password' => false]);
+        $this->actingAs($ptg)->get(route('master.peta.index'))->assertForbidden();
+        \App\Models\IzinPengguna::create(['user_id' => $ptg->id, 'izin' => 'lihat-master', 'boleh' => true]);
+        $ptg->lupakanIzin();
         $this->actingAs($ptg)->get(route('master.peta.index'))->assertOk();
         $this->actingAs($ptg)->get(route('master.peta.create'))->assertForbidden();
         $this->actingAs($ptg)->post(route('master.peta.store'), [])->assertForbidden();

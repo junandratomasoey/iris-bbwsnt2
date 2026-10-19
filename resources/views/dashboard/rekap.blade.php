@@ -15,7 +15,7 @@
 <x-layouts.app title="Rekap kondisi">
 <x-judul :judul="'Rekap kondisi irigasi · '.$periode->label" :sub="$periode->keterangan().' · '.$totalDi.' Daerah Irigasi'">
     <a href="{{ route('peta', $q) }}" class="btn-ghost"><x-ikon n="peta" class="h-4 w-4"/> Buka peta</a>
-    <a href="{{ route('rekap.unduh', $q) }}" class="btn-ghost"><x-ikon n="unduh" class="h-4 w-4"/> Unduh rekap</a>
+    @can('unduh-rekap')<a href="{{ route('rekap.unduh', $q) }}" class="btn-ghost"><x-ikon n="unduh" class="h-4 w-4"/> Unduh rekap</a>@endcan
     @if($menunggu)<a href="{{ route('laporan.index', ['verifikasi' => 'menunggu']) }}" class="btn-primary">{{ $menunggu }} laporan menunggu verifikasi</a>@endif
 </x-judul>
 
@@ -182,7 +182,7 @@
 <section class="panel mt-5 overflow-hidden">
     <div class="flex flex-wrap items-baseline justify-between gap-2 p-5 pb-3">
         <h2 class="text-lg font-semibold">Rekap per D.I.</h2>
-        <a href="{{ route('rekap.unduh', $q) }}" class="text-sm font-medium text-saluran-600">Unduh (CSV, bisa dibuka Excel)</a>
+        @can('unduh-rekap')<a href="{{ route('rekap.unduh', $q) }}" class="text-sm font-medium text-saluran-600">Unduh (CSV, bisa dibuka Excel)</a>@endcan
     </div>
     <div class="overflow-x-auto">
         <table class="table-base">

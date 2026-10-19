@@ -85,7 +85,7 @@ class DetailDiDanInfrastrukturTest extends TestCase
         ])->assertSessionHasErrors('sub_daerah_irigasi_id');
 
         $this->actingAs($this->petugas)->get(route('master.bangunan.create'))->assertForbidden();
-        $this->actingAs($this->petugas)->get(route('master.bangunan.index'))->assertOk();
+        $this->actingAs($this->petugas)->get(route('master.bangunan.index'))->assertForbidden();   // menu data master tidak termasuk izin bawaan petugas
     }
 
     public function test_detail_publik_mengelompokkan_foto_per_tanggal_tanpa_data_internal(): void

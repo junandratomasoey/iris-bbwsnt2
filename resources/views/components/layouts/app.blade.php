@@ -5,14 +5,16 @@
         ['dashboard', 'Dashboard', 'dashboard', true],
         ['peta', 'Peta kondisi', 'peta', true],
         ['laporan.index', 'Laporan harian', 'laporan', true],
+        ['pintu.index', 'Pintu air', 'pintu', true],
         ['kejadian.index', 'Kejadian kekeringan', 'kejadian', true],
-        ['petugas.index', 'Kontak petugas', 'petugas', ! $u->hasRole(Role::PETUGAS, Role::POB)],
+        ['petugas.index', 'Kontak petugas', 'petugas', $u->can('lihat-petugas') || $u->can('kelola-petugas')],
         ['master.daerah-irigasi.index', 'Daerah irigasi', 'di', true],
-        ['master.bangunan.index', 'Infrastruktur', 'bangunan', ! $u->hasRole(Role::PETUGAS, Role::POB)],
-        ['master.peta.index', 'Peta batas D.I.', 'peta', ! $u->hasRole(Role::PETUGAS, Role::POB)],
-        ['master.jadwal-tanam.index', 'Jadwal tanam', 'jadwal', ! $u->hasRole(Role::PETUGAS, Role::POB)],
-        ['master.p3a.index', 'P3A', 'p3a', ! $u->hasRole(Role::PETUGAS, Role::POB)],
+        ['master.bangunan.index', 'Infrastruktur', 'bangunan', $u->can('lihat-master')],
+        ['master.peta.index', 'Peta batas D.I.', 'peta', $u->can('lihat-master')],
+        ['master.jadwal-tanam.index', 'Jadwal tanam', 'jadwal', $u->can('lihat-master')],
+        ['master.p3a.index', 'P3A', 'p3a', $u->can('lihat-master')],
         ['pengguna.index', 'Pengguna', 'pengguna', $u->can('kelola-pengguna')],
+        ['hak-akses.index', 'Hak akses', 'kunci', $u->can('kelola-hak-akses')],
         ['audit', 'Log aktivitas', 'audit', $u->can('lihat-audit')],
     ];
 @endphp
@@ -35,13 +37,20 @@
         <a href="{{ route('dashboard') }}"><x-logo /></a>
         <button type="button" class="rounded p-1.5 hover:bg-saluran-700 lg:hidden" @click="nav = false" aria-label="Tutup menu"><x-ikon n="tutup"/></button>
     </div>
-    @can('lapor')
-        <div class="px-3 pb-3">
-            <a href="{{ route('laporan.create') }}" class="flex items-center justify-center gap-2 rounded-md bg-white px-3 py-2.5 text-sm font-semibold text-saluran-700 hover:bg-saluran-50">
-                <x-ikon n="tambah"/> Isi laporan hari ini
-            </a>
+    @if($u->can('lapor') || $u->can('isi-pintu'))
+        <div class="space-y-2 px-3 pb-3">
+            @can('lapor')
+                <a href="{{ route('laporan.create') }}" class="flex items-center justify-center gap-2 rounded-md bg-white px-3 py-2.5 text-sm font-semibold text-saluran-700 hover:bg-saluran-50">
+                    <x-ikon n="tambah"/> Isi laporan hari ini
+                </a>
+            @endcan
+            @can('isi-pintu')
+                <a href="{{ route('pembacaan-pintu.create') }}" class="flex items-center justify-center gap-2 rounded-md border border-white/60 px-3 py-2 text-sm font-semibold text-white hover:bg-saluran-700">
+                    <x-ikon n="pintu"/> Baca pintu air
+                </a>
+            @endcan
         </div>
-    @endcan
+    @endif
     <nav class="flex-1 space-y-0.5 overflow-y-auto px-3" aria-label="Menu utama">
         @foreach($menu as [$route, $label, $ikon, $tampil])
             @continue(! $tampil)

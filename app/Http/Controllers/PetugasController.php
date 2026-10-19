@@ -25,6 +25,7 @@ class PetugasController extends Controller
     {
         $u = $request->user();
         $kelola = $this->bolehMengelola($u);
+        abort_unless($kelola || $u->boleh('lihat-petugas'), 403);
         $status = $kelola ? $request->input('status', 'aktif') : 'aktif';
 
         $petugas = User::lapangan()
@@ -125,21 +126,19 @@ class PetugasController extends Controller
 
     private function bolehMengelola(User $u): bool
     {
-        return $u->hasRole(...Role::PENGELOLA)
-            || ($u->hasRole(Role::KOORDINATOR) && $u->wilayah_satgas_id)
-            || ($u->hasRole(Role::MANAGER) && $u->daerah_irigasi_id);
+        return $u->boleh('kelola-petugas') && $this->diKelola($u) !== [];
     }
 
     /** ID D.I. yang kontaknya boleh dikelola. null = semua. */
     private function diKelola(User $u): ?array
     {
-        if ($u->hasRole(...Role::PENGELOLA)) {
+        if ($u->isGlobal()) {
             return null;
         }
 
         return once(fn () => match (true) {
             $u->hasRole(Role::KOORDINATOR) && (bool) $u->wilayah_satgas_id => DaerahIrigasi::whereHas('kabupaten', fn ($k) => $k->where('wilayah_satgas_id', $u->wilayah_satgas_id))->pluck('id')->all(),
-            $u->hasRole(Role::MANAGER) && (bool) $u->daerah_irigasi_id => [$u->daerah_irigasi_id],
+            (bool) $u->daerah_irigasi_id => [$u->daerah_irigasi_id],
             default => [],
         });
     }
@@ -147,7 +146,7 @@ class PetugasController extends Controller
     /** Role yang boleh diberikan. Manager hanya oleh Admin OP / Super Admin. */
     private function roleBoleh(User $u): array
     {
-        return $u->hasRole(...Role::PENGELOLA) ? [Role::PETUGAS, Role::POB, Role::MANAGER] : [Role::PETUGAS, Role::POB];
+        return $u->boleh('kelola-pengguna') ? [Role::PETUGAS, Role::POB, Role::MANAGER] : [Role::PETUGAS, Role::POB];
     }
 
     private function bolehUbah(User $u, User $target): bool

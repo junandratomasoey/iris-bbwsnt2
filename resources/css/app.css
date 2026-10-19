@@ -21,7 +21,7 @@
     .panel { @apply rounded-lg border border-savana-line bg-white; }
     .label { @apply mb-1 block text-sm font-medium text-basalt-soft; }
     .input { @apply block w-full rounded-md border-savana-line text-sm shadow-none focus:border-saluran-500 focus:ring-saluran-500; }
-    .table-base { @apply min-w-full text-sm; }
+    .table-base { @apply relative min-w-full text-sm; }
     .table-base th { @apply whitespace-nowrap border-b border-savana-line bg-savana px-3 py-2 text-left font-semibold text-basalt-soft; }
     .table-base td { @apply border-b border-savana-line px-3 py-2 align-top; }
     .chip { @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold; }
@@ -29,6 +29,7 @@
     .chip-waspada { @apply chip bg-[#FBF0CC] text-[#7A5A00]; }
     .chip-siaga { @apply chip bg-[#FBE3D6] text-[#8A3510]; }
     .chip-kritis { @apply chip bg-[#F6D9D7] text-[#7E1A14]; }
+    .chip-lebih { @apply chip bg-[#DCEBF7] text-[#1B4F7A]; }
     .chip-kosong { @apply chip bg-savana-deep text-basalt-soft; }
     .nav-link { @apply flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-saluran-100 hover:bg-saluran-700 hover:text-white; }
     .nav-link.active { @apply bg-saluran-800 text-white; }

@@ -28,6 +28,24 @@
     @endif
 </section>
 
+@if($pintu->isNotEmpty())
+<section class="mt-8" aria-labelledby="judul-pintu">
+    <h2 id="judul-pintu" class="mb-1 text-lg font-semibold">Pembacaan pintu air</h2>
+    <p class="mb-2 text-sm text-basalt-soft">Jadwal rutin setiap Senin. Di luar Senin, baca juga bila ada panen, pekerjaan di sawah, atau kejadian khusus.</p>
+    <ul class="grid gap-3 sm:grid-cols-2">
+        @foreach($pintu as $r)
+            <li class="panel flex items-center justify-between gap-3 p-4">
+                <div class="min-w-0">
+                    <p class="truncate font-semibold">D.I. {{ $r['di']->nama }}</p>
+                    <p class="text-xs {{ $r['belum'] ? 'font-semibold text-[#8A3510]' : 'text-status-aman' }}">{{ $r['dibaca'] }}/{{ $r['total'] }} pintu dibaca sejak Senin</p>
+                </div>
+                <a href="{{ route('pembacaan-pintu.create', ['di' => $r['di']->id]) }}" class="{{ $r['belum'] ? 'btn-primary' : 'btn-ghost' }} shrink-0"><x-ikon n="pintu" class="h-4 w-4"/> Baca</a>
+            </li>
+        @endforeach
+    </ul>
+</section>
+@endif
+
 <section class="mt-8" aria-labelledby="judul-riwayat">
     <div class="mb-2 flex items-baseline justify-between">
         <h2 id="judul-riwayat" class="text-lg font-semibold">Laporan saya</h2>
@@ -49,7 +67,7 @@
 </section>
 
 <div class="mt-6 flex flex-wrap gap-2">
-    <a href="{{ route('kejadian.create') }}" class="btn-ghost"><x-ikon n="kejadian" class="h-4 w-4"/> Laporkan kejadian kekeringan</a>
+    @can('lapor-kejadian')<a href="{{ route('kejadian.create') }}" class="btn-ghost"><x-ikon n="kejadian" class="h-4 w-4"/> Laporkan kejadian kekeringan</a>@endcan
     <a href="{{ route('peta') }}" class="btn-ghost"><x-ikon n="peta" class="h-4 w-4"/> Peta wilayah saya</a>
 </div>
 </x-layouts.app>

@@ -1,6 +1,6 @@
 <x-layouts.app title="Laporan harian">
 <x-judul judul="Laporan harian" sub="Laporan kondisi air dan lahan dari petugas lapangan.">
-    <a href="{{ route('laporan.ekspor', request()->query()) }}" class="btn-ghost"><x-ikon n="unduh" class="h-4 w-4"/> Unduh CSV</a>
+    @can('unduh-rekap')<a href="{{ route('laporan.ekspor', request()->query()) }}" class="btn-ghost"><x-ikon n="unduh" class="h-4 w-4"/> Unduh CSV</a>@endcan
     @can('create', App\Models\LaporanHarian::class)
         <a href="{{ route('laporan.create') }}" class="btn-primary"><x-ikon n="tambah" class="h-4 w-4"/> Isi laporan</a>
     @endcan

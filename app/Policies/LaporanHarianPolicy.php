@@ -15,7 +15,7 @@ class LaporanHarianPolicy
 
     public function create(User $user): bool
     {
-        return $user->hasRole(...Role::PELAPOR);
+        return $user->boleh('lapor');
     }
 
     public function update(User $user, LaporanHarian $l): bool
@@ -34,6 +34,6 @@ class LaporanHarianPolicy
 
     public function verify(User $user, LaporanHarian $l): bool
     {
-        return $user->hasRole(...Role::VERIFIKATOR) && $user->bolehLihatSub($l->sub_daerah_irigasi_id);
+        return $user->boleh('verifikasi') && $user->bolehLihatSub($l->sub_daerah_irigasi_id);
     }
 }
