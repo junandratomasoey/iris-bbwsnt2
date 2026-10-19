@@ -301,15 +301,24 @@ export function createMap(opsi) {
                 baku: { weight: 1.5, fillOpacity: 0, dashArray: '5 4' },
                 potensial: { weight: 1, fillOpacity: 0.12, dashArray: '2 4' },
             };
+            // D.I. tanpa poligon areal fungsional di Peta IGT (mis. Wae Musur, Satar Beleng, Baing):
+            // warna statusnya ditampilkan pada poligon luas baku agar tetap terlihat saat zoom dekat.
+            const punyaFungsional = new Set((geo.fungsional?.features || []).map((f) => f.properties.kode));
+            const bakuSebagaiStatus = (f) => this.lapis.fungsional && !punyaFungsional.has(f.properties.kode) && !!diByKode[f.properties.kode];
             ['potensial', 'baku', 'fungsional'].forEach((n) => {
-                if (!this.lapis[n] || !geo[n]) return;
+                if (!geo[n]) return;
+                if (!this.lapis[n] && !(n === 'baku' && this.lapis.fungsional)) return;
                 layers[n] = L.geoJSON(geo[n], {
                     filter: (f) => {
+                        if (n === 'baku' && !this.lapis.baku && !bakuSebagaiStatus(f)) return false;
                         const d = diByKode[f.properties.kode];
                         return d ? this.cocok(d) : (!this.kabupaten && !this.satgas);
                     },
                     style: (f) => {
                         const d = diByKode[f.properties.kode];
+                        if (n === 'baku' && bakuSebagaiStatus(f)) {
+                            return { color: d.warna, fillColor: d.warna, weight: 1.5, fillOpacity: 0.45, dashArray: '5 4' };
+                        }
                         const warna = n === 'fungsional' ? (d ? d.warna : '#9AA4A8') : (n === 'baku' ? '#0B4955' : '#16798C');
                         return { color: warna, fillColor: warna, ...gaya[n] };
                     },
@@ -424,7 +433,9 @@ export function createMap(opsi) {
                 if (!r.ok) throw new Error(r.status);
                 const data = await r.json();
                 if (this.detailId !== id) return; // pengguna sudah membuka D.I. lain
-                this.detail = { ...data, foto_harian: data.foto_harian.map(siapkanGaleri) };
+                const kode = this.data?.daerah_irigasi.find((x) => x.id === id)?.kode;
+                this.detail = { ...data, foto_harian: data.foto_harian.map(siapkanGaleri),
+                    ada_fungsional: (geo.fungsional?.features || []).some((f) => f.properties.kode === kode) };
                 if (ganti && !this.detail.foto_harian.length) this.detailTab = 'sub';
                 this.gambarBangunanDi();
             } catch (e) {
@@ -476,12 +487,17 @@ export function createMap(opsi) {
             if (layers.sorot) { map.removeLayer(layers.sorot); layers.sorot = null; }
             const d = this.diPilih;
             if (!d) return;
-            const fitur = ['fungsional', 'baku'].flatMap((n) => (geo[n]?.features || []).filter((f) => f.properties.kode === d.kode));
-            if (fitur.length) {
-                layers.sorot = L.geoJSON({ type: 'FeatureCollection', features: fitur }, {
-                    interactive: false, style: { color: '#0F2A33', weight: 3.5, fill: false, dashArray: null },
-                }).addTo(map);
-            }
+            // luas baku = garis putus-putus (di bawah), areal fungsional = garis penuh (di atas)
+            const GAYA_SOROT = {
+                baku: { color: '#0F2A33', weight: 2, opacity: 0.85, fill: false, dashArray: '7 6' },
+                fungsional: { color: '#0F2A33', weight: 3.5, opacity: 1, fill: false, dashArray: null },
+            };
+            const grup = L.featureGroup();
+            ['baku', 'fungsional'].forEach((n) => {
+                const fitur = (geo[n]?.features || []).filter((f) => f.properties.kode === d.kode);
+                if (fitur.length) L.geoJSON({ type: 'FeatureCollection', features: fitur }, { interactive: false, style: GAYA_SOROT[n] }).addTo(grup);
+            });
+            if (grup.getLayers().length) layers.sorot = grup.addTo(map);
             if (!terbang) return;
             if (layers.sorot) map.flyToBounds(layers.sorot.getBounds(), { padding: [30, 30], maxZoom: 14, duration: 0.8 });
             else if (d.lat) map.flyTo([d.lat, d.lng], 12, { duration: 0.8 });
