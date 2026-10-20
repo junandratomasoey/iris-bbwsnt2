@@ -46,7 +46,8 @@
     <section class="panel p-5">
         <h2 class="text-lg font-semibold">Laporan masuk hari ini</h2>
         <p class="mt-2 font-gauge text-4xl font-semibold">{{ $laporHariIni }}<span class="text-xl text-basalt-mute"> / {{ $totalSub }}</span></p>
-        <p class="text-sm text-basalt-soft">Sub-D.I. sudah melapor ({{ $persenLapor }}%)</p>
+        <p class="text-sm text-basalt-soft">Sub-D.I. sudah ada laporan tanaman PPA ({{ $persenLapor }}%)</p>
+        <p class="mt-2 text-sm"><a href="{{ route('laporan-air.index') }}" class="hover:underline"><b class="font-gauge text-xl">{{ $airHariIni }}</b><span class="text-basalt-mute"> / {{ $totalDi }}</span> D.I. sudah ada laporan air Manager</a></p>
         <ul class="mt-4 space-y-2.5">
             @foreach($kepatuhan as $k)
                 @php $p = $k['total'] ? $k['masuk'] / $k['total'] * 100 : 0; @endphp
@@ -121,14 +122,13 @@
     @else
         <div class="overflow-x-auto">
             <table class="table-base">
-                <thead><tr><th>Sub-D.I.</th><th>Status</th><th class="text-right">Debit (L/dt)</th><th class="text-right">Tanam / kering / puso (Ha)</th><th>Kendala</th><th>Petugas</th></tr></thead>
+                <thead><tr><th>Sub-D.I.</th><th>Status</th><th class="text-right">Tanam / kering / puso (Ha)</th><th>Kendala</th><th>Petugas</th></tr></thead>
                 <tbody>
                 @foreach($kritis as $x)
                     @php $l = $x['laporan']; $s = $l->subDaerahIrigasi; @endphp
                     <tr>
                         <td><a href="{{ route('laporan.show', $l) }}" class="font-semibold hover:underline">{{ $s->nama }}</a><div class="text-xs text-basalt-soft">D.I. {{ $s->daerahIrigasi->nama }} · {{ $l->tanggal->translatedFormat('d M') }}</div></td>
                         <td><x-status :s="$x['status']"/></td>
-                        <td class="text-right tabular-nums">{{ angka($l->debit_intake_lps, 1) }}</td>
                         <td class="text-right tabular-nums">{{ angka($l->luas_tanam_ha, 1) }} / {{ angka($l->luas_kering_ha, 1) }} / {{ angka($l->luas_puso_ha, 1) }}</td>
                         <td class="max-w-xs text-xs text-basalt-soft">{{ \Illuminate\Support\Str::limit($l->kendala, 90) }}</td>
                         <td>

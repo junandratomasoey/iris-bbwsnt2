@@ -20,6 +20,7 @@ class KejadianController extends Controller
     public function index(Request $request)
     {
         $kejadian = Kejadian::with(['kabupaten:id,nama,wilayah_satgas_id', 'kabupaten.wilayahSatgas:id,kode', 'daerahIrigasi:id,nama'])->withCount('foto')
+            ->terjangkau($request->user())
             ->when($request->filled('status'), fn ($q) => $q->where('status_penanganan', $request->input('status')))
             ->when($request->filled('kabupaten'), fn ($q) => $q->where('kabupaten_id', $request->integer('kabupaten')))
             ->when($request->filled('jenis'), fn ($q) => $q->where('jenis_kegagalan', $request->input('jenis')))
@@ -27,7 +28,7 @@ class KejadianController extends Controller
             ->latest('tanggal_lapor')->latest('id')
             ->paginate(25)->withQueryString();
 
-        $rekap = Kejadian::selectRaw('status_penanganan, count(*) jumlah, sum(luas_terdampak_ha) luas')->groupBy('status_penanganan')->get()->keyBy('status_penanganan');
+        $rekap = Kejadian::terjangkau($request->user())->selectRaw('status_penanganan, count(*) jumlah, sum(luas_terdampak_ha) luas')->groupBy('status_penanganan')->get()->keyBy('status_penanganan');
         $kabupatenList = Kabupaten::whereHas('wilayahSatgas')->orWhereIn('id', Kejadian::select('kabupaten_id'))->orderBy('nama')->get(['id', 'nama']);
 
         return view('kejadian.index', compact('kejadian', 'rekap', 'kabupatenList'));
@@ -57,6 +58,7 @@ class KejadianController extends Controller
 
     public function show(Kejadian $kejadian)
     {
+        $this->authorize('view', $kejadian);
         $kejadian->load('kabupaten.wilayahSatgas', 'daerahIrigasi', 'subDaerahIrigasi', 'user', 'foto');
 
         return view('kejadian.show', compact('kejadian'));
@@ -161,10 +163,12 @@ class KejadianController extends Controller
 
     private function opsi(): array
     {
+        $diIds = request()->user()->diIdsTerjangkau();
+
         return [
             'kabupatenList' => Kabupaten::orderBy('nama')->get(['id', 'nama']),
-            'diList' => DaerahIrigasi::orderBy('nama')->get(['id', 'nama', 'kabupaten_id']),
-            'subList' => SubDaerahIrigasi::orderBy('nama')->get(['id', 'nama', 'daerah_irigasi_id']),
+            'diList' => DaerahIrigasi::when($diIds !== null, fn ($q) => $q->whereIn('id', $diIds))->orderBy('nama')->get(['id', 'nama', 'kabupaten_id']),
+            'subList' => SubDaerahIrigasi::when($diIds !== null, fn ($q) => $q->whereIn('daerah_irigasi_id', $diIds))->orderBy('nama')->get(['id', 'nama', 'daerah_irigasi_id']),
         ];
     }
 }

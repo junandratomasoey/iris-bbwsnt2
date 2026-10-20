@@ -44,6 +44,25 @@
 
 <template x-if="detail">
 <div>
+    {{-- laporan air Manager terakhir (berlaku 3 hari) --}}
+    <section class="border-b border-savana-line px-4 py-3 text-xs" aria-label="Air sungai, intake dan saluran">
+        <div class="flex items-baseline justify-between gap-2">
+            <h3 class="text-sm font-semibold">Air sungai, intake & saluran</h3>
+            <template x-if="detail.air"><span class="font-semibold" :style="`color:${detail.air.warna}`" x-text="'Saluran ' + String(detail.air.kondisi).toLowerCase()"></span></template>
+        </div>
+        <template x-if="detail.air">
+            <div class="mt-1 text-basalt-soft">
+                <p x-text="'Laporan Manager ' + detail.air.tanggal"></p>
+                @if($internal)
+                    <p class="mt-0.5 text-basalt" x-text="[detail.air.debit_sungai !== null ? `Sungai ${fmt(detail.air.debit_sungai, 2)} m³/dt` : null, detail.air.tma_sungai !== null ? `TMA sungai ${fmt(detail.air.tma_sungai, 0)} cm` : null, `Intake ${fmt(detail.air.debit_intake, 1)} L/dt`, detail.air.tma_intake !== null ? `TMA intake ${fmt(detail.air.tma_intake, 0)} cm` : null].filter(Boolean).join(' · ')"></p>
+                    <p x-show="detail.air.catatan" class="mt-0.5 italic" x-text="detail.air.catatan"></p>
+                    <a :href="detail.air.url" class="font-semibold text-saluran-600">Laporan air</a>
+                @endif
+            </div>
+        </template>
+        <p x-show="!detail.air" class="mt-1 text-basalt-mute">Belum ada laporan air dari Manager dalam 3 hari terakhir.</p>
+    </section>
+
     {{-- riwayat 30 hari: satu kotak per hari, warna = status terberat hari itu --}}
     <section class="border-b border-savana-line px-4 py-3" aria-labelledby="judul-riwayat">
         <div class="flex items-baseline justify-between">
@@ -94,11 +113,11 @@
                     <div class="mt-2">
                         <p class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
                             <span class="inline-flex items-center gap-1 font-semibold text-basalt"><span class="h-2 w-2 rounded-full" :style="`background:${l.warna}`"></span><span x-text="l.sub"></span></span>
-                            <span class="text-basalt-soft" x-text="['Saluran ' + (l.kondisi || '').toLowerCase(), l.fase].filter(Boolean).join(' · ')"></span>
-                            <span x-show="!l.terverifikasi" class="rounded bg-savana-deep px-1.5 text-[10px] text-basalt-soft">belum diverifikasi</span>
+                            <span class="text-basalt-soft" x-text="[l.kondisi ? 'Saluran ' + l.kondisi.toLowerCase() : null, l.fase].filter(Boolean).join(' · ')"></span>
+                            <span x-show="l.terverifikasi === false" class="rounded bg-savana-deep px-1.5 text-[10px] text-basalt-soft">belum diverifikasi</span>
                         </p>
                         @if($internal)
-                            <p class="text-[11px] text-basalt-mute"><span x-text="`Debit ${fmt(l.debit, 1)} L/dt · TMA ${fmt(l.tma, 1)} cm · ${l.pelapor ?? ''}`"></span> · <a :href="l.url" class="font-semibold text-saluran-600">Detail</a></p>
+                            <p class="text-[11px] text-basalt-mute"><span x-text="[l.debit_sungai !== undefined && l.debit_sungai !== null ? `Sungai ${fmt(l.debit_sungai, 2)} m³/dt` : null, l.debit !== null ? `Intake ${fmt(l.debit, 1)} L/dt` : null, l.tma !== null ? `TMA ${fmt(l.tma, 1)} cm` : null, l.pelapor].filter(Boolean).join(' · ')"></span> · <a :href="l.url" class="font-semibold text-saluran-600">Detail</a></p>
                         @endif
                         <p x-show="l.komoditas" class="text-[11px] text-basalt-soft" x-text="l.komoditas"></p>
                         <p x-show="l.kendala" class="mt-0.5 text-xs italic text-basalt-soft" x-text="l.kendala"></p>
@@ -132,10 +151,10 @@
                     <p class="text-basalt-mute" x-text="[s.lokasi, fmt(s.luas_ha) + ' Ha'].filter(Boolean).join(' · ')"></p>
                     <template x-if="s.laporan">
                         <div class="mt-1 text-basalt-soft">
-                            <p x-text="`${s.laporan.tanggal} · saluran ${String(s.laporan.kondisi).toLowerCase()}${s.laporan.fase ? ' · ' + s.laporan.fase : ''}`"></p>
+                            <p x-text="[s.laporan.tanggal, s.laporan.kondisi ? 'saluran ' + String(s.laporan.kondisi).toLowerCase() : null, s.laporan.fase].filter(Boolean).join(' · ')"></p>
                             <p x-show="s.laporan.komoditas" x-text="s.laporan.komoditas"></p>
                             <p>Tanam <b class="text-basalt" x-text="fmt(s.laporan.tanam, 1)"></b> · kering <b class="text-basalt" x-text="fmt(s.laporan.kering, 1)"></b> · puso <b class="text-basalt" x-text="fmt(s.laporan.puso, 1)"></b> Ha</p>
-                            @if($internal)<p x-show="!(s.laporan.petak || []).length">Debit <b class="text-basalt" x-text="fmt(s.laporan.debit, 1)"></b> L/dt · TMA <b class="text-basalt" x-text="fmt(s.laporan.tma, 1)"></b> cm · <a :href="s.laporan.url" class="font-semibold text-saluran-600">Laporan</a></p>@endif
+                            @if($internal)<p x-show="!(s.laporan.petak || []).length && s.laporan.debit !== null">Debit <b class="text-basalt" x-text="fmt(s.laporan.debit, 1)"></b> L/dt · TMA <b class="text-basalt" x-text="fmt(s.laporan.tma, 1)"></b> cm · <a :href="s.laporan.url" class="font-semibold text-saluran-600">Laporan</a></p>@endif
                             <template x-if="(s.laporan.petak || []).length">
                                 <ul class="mt-1.5 space-y-1 border-l-2 border-savana-line pl-2">
                                     <template x-for="pt in s.laporan.petak" :key="pt.kode">

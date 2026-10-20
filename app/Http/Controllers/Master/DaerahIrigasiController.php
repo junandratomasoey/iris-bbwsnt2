@@ -18,7 +18,9 @@ class DaerahIrigasiController extends Controller
     public function index(Request $request, KondisiService $kondisi)
     {
         $ringkasan = $kondisi->ringkasanDi(today());
+        $diIds = $request->user()->diIdsTerjangkau(); // Manager/Koordinator/PPA: hanya D.I. wilayahnya
         $di = DaerahIrigasi::with('kabupaten.wilayahSatgas')->withCount(['subDaerahIrigasi', 'petugas', 'bangunan', 'fotoProfil'])
+            ->when($diIds !== null, fn ($q) => $q->whereIn('id', $diIds))
             ->when($request->filled('q'), fn ($q) => $q->where('nama', 'like', '%'.$request->q.'%'))
             ->orderBy('kode')->get();
 
@@ -27,15 +29,16 @@ class DaerahIrigasiController extends Controller
 
     public function show(DaerahIrigasi $di, KondisiService $kondisi)
     {
+        $diIds = request()->user()->diIdsTerjangkau();
+        abort_unless($diIds === null || in_array($di->id, $diIds, true), 403, 'D.I. ini di luar wilayah tugas Anda.');
         $di->load(['fotoProfil', 'kabupaten.wilayahSatgas', 'subDaerahIrigasi.petugas:id,name,no_hp,jabatan', 'bangunan', 'jadwalTanam',
             'petugas' => fn ($q) => $q->orderByRaw("CASE jabatan WHEN 'Manager' THEN 0 WHEN 'POB' THEN 1 ELSE 2 END")->orderBy('name')]);
         $ring = $kondisi->ringkasanDi(today())->get($di->id);
         $laporanTerkini = $kondisi->laporanTerkini(today(), $di->subDaerahIrigasi->pluck('id')->all());
         $p3a = P3a::where('daerah_irigasi_id', $di->id)->orWhere('kabupaten_id', $di->kabupaten_id)->orderBy('nama')->limit(50)->get();
-        $tren = LaporanHarian::whereIn('sub_daerah_irigasi_id', $di->subDaerahIrigasi->pluck('id'))
-            ->where('tanggal', '>=', today()->subDays(29))
-            ->selectRaw('tanggal, sum(debit_intake_lps) debit, sum(luas_kering_ha) kering, sum(luas_tanam_ha) tanam, count(*) n')
-            ->groupBy('tanggal')->orderBy('tanggal')->get();
+        // debit intake & sungai harian dari laporan air Manager
+        $tren = \App\Models\LaporanAir::where('daerah_irigasi_id', $di->id)->where('tanggal', '>=', today()->subDays(29)->toDateString())
+            ->orderBy('tanggal')->get(['tanggal', 'debit_intake_lps', 'debit_sungai_m3s', 'kondisi_saluran']);
 
         $pintu = app(\App\Services\PintuService::class)->daftar(null, $di->id, 2);
         $skemaN = $di->skemaJaringan()->count();

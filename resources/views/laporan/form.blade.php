@@ -31,7 +31,7 @@
 @endphp
 <x-layouts.app :title="$baru ? 'Isi laporan harian' : 'Ubah laporan'">
 <div class="mx-auto max-w-2xl">
-<x-judul :judul="$baru ? 'Laporan harian' : 'Ubah laporan'" sub="Isi kondisi air dan tanaman di petak/Sub-D.I. tugas Anda hari ini. Kolom bertanda * wajib diisi."/>
+<x-judul :judul="$baru ? 'Laporan tanaman' : 'Ubah laporan tanaman'" sub="Tugas PPA: kondisi tanaman di petak tersier tugas Anda hari ini. Air intake & saluran dilaporkan Manager. Kolom bertanda * wajib diisi."/>
 
 @if(! $baru && $laporan->status_verifikasi === 'perbaikan')
     <div class="mb-4 rounded-md border border-[#E9B7B3] bg-[#FBECEA] px-4 py-3 text-sm text-[#7E1A14]">
@@ -89,37 +89,6 @@
         @endif
     </fieldset>
 
-    <fieldset class="panel space-y-4 p-4 sm:p-5">
-        <legend class="float-left mb-1 font-gauge text-lg font-semibold" x-text="petakTerpilih ? 'Air di pintu tersier ' + petakTerpilih.kode : 'Air di intake dan saluran'">Air di intake dan saluran</legend>
-        <p x-show="petakTerpilih?.bacaan" x-cloak class="clear-left rounded-md bg-saluran-50 px-3 py-2 text-xs">
-            Pembacaan pintu <b x-text="petakTerpilih?.kode"></b> tanggal <span x-text="petakTerpilih?.bacaan?.tanggal"></span>: debit <b x-text="petakTerpilih?.bacaan?.debit ?? '–'"></b> L/dt, TMA <b x-text="petakTerpilih?.bacaan?.tma ?? '–'"></b> cm.
-            <button type="button" class="font-semibold text-saluran-600 underline" @click="pakaiBacaan()">Pakai angka ini</button>
-        </p>
-        <div class="clear-left grid grid-cols-2 gap-4">
-            <x-field name="debit_intake_lps" label="Debit (L/detik)" wajib hint="Intake, atau pintu tersier bila melapor per petak.">
-                <input id="debit_intake_lps" name="debit_intake_lps" type="number" step="0.01" min="0" inputmode="decimal" x-model="f.debit_intake_lps" required class="input py-2.5 text-lg tabular-nums">
-            </x-field>
-            <x-field name="tma_cm" label="TMA (cm)" wajib>
-                <input id="tma_cm" name="tma_cm" type="number" step="0.1" inputmode="decimal" x-model="f.tma_cm" required class="input py-2.5 text-lg tabular-nums">
-            </x-field>
-        </div>
-        <x-field name="kondisi_saluran" label="Kondisi air di saluran" wajib>
-            <div class="grid grid-cols-4 gap-2" role="radiogroup">
-                @foreach(LH::KONDISI as $k => $l)
-                    <label class="cursor-pointer">
-                        <input type="radio" name="kondisi_saluran" value="{{ $k }}" x-model="f.kondisi_saluran" class="peer sr-only" required>
-                        <span class="block rounded-md border border-savana-line py-2.5 text-center text-sm font-medium peer-checked:border-saluran-600 peer-checked:bg-saluran-600 peer-checked:text-white peer-focus-visible:ring-2 peer-focus-visible:ring-saluran-500">{{ $l }}</span>
-                    </label>
-                @endforeach
-            </div>
-        </x-field>
-        <x-field name="bukaan_pintu_persen" label="Bukaan pintu intake (%)" hint="Kosongkan bila tidak ada pintu.">
-            <div class="flex items-center gap-3">
-                <input type="range" min="0" max="100" step="5" x-model="f.bukaan_pintu_persen" class="flex-1 accent-saluran-600" aria-label="Bukaan pintu">
-                <input id="bukaan_pintu_persen" name="bukaan_pintu_persen" type="number" min="0" max="100" x-model="f.bukaan_pintu_persen" class="input w-20 tabular-nums">
-            </div>
-        </x-field>
-    </fieldset>
 
     <fieldset class="panel space-y-4 p-4 sm:p-5">
         <legend class="float-left mb-1 font-gauge text-lg font-semibold">Kondisi tanaman</legend>

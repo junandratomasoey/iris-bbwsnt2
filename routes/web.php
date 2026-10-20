@@ -5,6 +5,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\HakAksesController;
 use App\Http\Controllers\KejadianController;
+use App\Http\Controllers\LaporanAirController;
 use App\Http\Controllers\LaporanHarianController;
 use App\Http\Controllers\Master\BangunanController;
 use App\Http\Controllers\Master\DaerahIrigasiController;
@@ -49,6 +50,9 @@ Route::middleware(['auth', 'siap'])->group(function () {
     Route::post('/laporan/{laporan}/verifikasi', [LaporanHarianController::class, 'verifikasi'])->name('laporan.verifikasi');
     Route::delete('/laporan/{laporan}/foto/{foto}', [LaporanHarianController::class, 'hapusFoto'])->name('laporan.foto.destroy');
     Route::resource('laporan', LaporanHarianController::class)->parameters(['laporan' => 'laporan']);
+
+    Route::delete('/laporan-air/{laporan_air}/foto/{foto}', [LaporanAirController::class, 'hapusFoto'])->name('laporan-air.foto.destroy');
+    Route::resource('laporan-air', LaporanAirController::class);
 
     Route::patch('/kejadian/{kejadian}/penanganan', [KejadianController::class, 'penanganan'])->name('kejadian.penanganan');
     Route::post('/kejadian/{kejadian}/foto', [KejadianController::class, 'tambahFoto'])->name('kejadian.foto.store');

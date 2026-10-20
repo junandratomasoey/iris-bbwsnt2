@@ -1,10 +1,11 @@
 <x-layouts.app title="Laporan harian">
-<x-judul judul="Laporan harian" sub="Laporan kondisi air dan lahan dari petugas lapangan.">
+<x-judul judul="Laporan harian" sub="Air sungai, intake & saluran diisi Manager per D.I.; kondisi tanaman diisi PPA per petak.">
     @can('unduh-rekap')<a href="{{ route('laporan.ekspor', request()->query()) }}" class="btn-ghost"><x-ikon n="unduh" class="h-4 w-4"/> Unduh CSV</a>@endcan
     @can('create', App\Models\LaporanHarian::class)
-        <a href="{{ route('laporan.create') }}" class="btn-primary"><x-ikon n="tambah" class="h-4 w-4"/> Isi laporan</a>
+        <a href="{{ route('laporan.create') }}" class="btn-primary"><x-ikon n="tambah" class="h-4 w-4"/> Isi laporan tanaman</a>
     @endcan
 </x-judul>
+<x-tab-laporan aktif="tanaman"/>
 
 <form method="GET" class="panel mb-4 grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-6">
     <label class="lg:col-span-2"><span class="label">D.I.</span>
@@ -53,16 +54,14 @@
         {{-- tabel untuk layar lebar --}}
         <div class="hidden overflow-x-auto md:block">
             <table class="table-base">
-                <thead><tr>@if($idSiap->isNotEmpty())<th class="w-8"></th>@endif<th>Tanggal</th><th>Sub-D.I.</th><th class="text-right">Debit (L/dt)</th><th class="text-right">TMA (cm)</th><th>Saluran</th><th class="text-right">Tanam / kering / puso (Ha)</th><th>Status</th><th>Pelapor</th><th>Verifikasi</th></tr></thead>
+                <thead><tr>@if($idSiap->isNotEmpty())<th class="w-8"></th>@endif<th>Tanggal</th><th>Sub-D.I.</th><th>Fase / komoditas</th><th class="text-right">Tanam / kering / puso (Ha)</th><th>Status</th><th>Pelapor</th><th>Verifikasi</th></tr></thead>
                 <tbody>
                 @foreach($laporan as $l)
                     <tr class="hover:bg-savana" :class="pilih.includes({{ $l->id }}) && 'bg-saluran-50'">
                         @if($idSiap->isNotEmpty())<td>@if($bolehSetujui($l))<input type="checkbox" value="{{ $l->id }}" x-model.number="pilih" class="rounded border-savana-line text-saluran-600" aria-label="Pilih laporan {{ $l->subDaerahIrigasi->nama }} {{ $l->tanggal->format('d/m') }}">@endif</td>@endif
                         <td class="whitespace-nowrap"><a href="{{ route('laporan.show', $l) }}" class="font-semibold text-saluran-700 hover:underline">{{ $l->tanggal->translatedFormat('d M Y') }}</a></td>
                         <td>{{ $l->subDaerahIrigasi->nama }}@if($l->petak)<span class="ml-1 rounded bg-savana-deep px-1.5 text-xs font-semibold">Petak {{ $l->petak->kode }}</span>@endif<div class="text-xs text-basalt-soft">D.I. {{ $l->subDaerahIrigasi->daerahIrigasi->nama }}</div></td>
-                        <td class="text-right tabular-nums">{{ angka($l->debit_intake_lps, 1) }}</td>
-                        <td class="text-right tabular-nums">{{ angka($l->tma_cm, 1) }}</td>
-                        <td>{{ App\Models\LaporanHarian::KONDISI[$l->kondisi_saluran] ?? $l->kondisi_saluran }}</td>
+                        <td class="text-xs">{{ App\Models\LaporanHarian::FASE[$l->fase_tanaman] ?? '–' }}<div class="text-basalt-soft">{{ $l->ringkasKomoditas() }}</div></td>
                         <td class="whitespace-nowrap text-right tabular-nums">{{ angka($l->luas_tanam_ha, 1) }} / {{ angka($l->luas_kering_ha, 1) }} / {{ angka($l->luas_puso_ha, 1) }}</td>
                         <td><x-status :s="$l->status()"/></td>
                         <td class="text-xs">{{ $l->user->name }}@if($l->foto_count)<div class="text-basalt-mute">{{ $l->foto_count }} foto</div>@endif</td>
@@ -84,7 +83,7 @@
                         <div><p class="font-semibold">{{ $l->subDaerahIrigasi->nama }}@if($l->petak) · Petak {{ $l->petak->kode }}@endif</p><p class="text-xs text-basalt-soft">{{ $l->tanggal->translatedFormat('d M Y') }} · {{ $l->user->name }}</p></div>
                         <x-status :s="$l->status()"/>
                     </div>
-                    <p class="mt-1 text-xs text-basalt-soft">Debit {{ angka($l->debit_intake_lps, 1) }} L/dt · TMA {{ angka($l->tma_cm, 1) }} cm · kering {{ angka($l->luas_kering_ha, 1) }} Ha</p>
+                    <p class="mt-1 text-xs text-basalt-soft">Tanam {{ angka($l->luas_tanam_ha, 1) }} · kering {{ angka($l->luas_kering_ha, 1) }} · puso {{ angka($l->luas_puso_ha, 1) }} Ha</p>
                     <div class="mt-1"><x-verifikasi :s="$l->status_verifikasi"/></div>
                 </a></li>
             @endforeach

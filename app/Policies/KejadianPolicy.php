@@ -10,7 +10,7 @@ class KejadianPolicy
 {
     public function view(User $user, Kejadian $k): bool
     {
-        return true;
+        return Kejadian::whereKey($k->id)->terjangkau($user)->exists();
     }
 
     public function create(User $user): bool

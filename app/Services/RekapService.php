@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\DaerahIrigasi;
 use App\Models\Kabupaten;
 use App\Models\Kejadian;
+use App\Models\LaporanAir;
 use App\Models\LaporanHarian;
 use App\Models\SubDaerahIrigasi;
 use App\Models\WilayahSatgas;
@@ -27,7 +28,7 @@ class RekapService
 
     public function rekap(Periode $p, ?array $subIds = null): array
     {
-        $kunci = 'rekap:v5:'.md5(json_encode($subIds)).':'.$p->dari->toDateString().':'.$p->sampai->toDateString();
+        $kunci = 'rekap:v6:'.md5(json_encode($subIds)).':'.$p->dari->toDateString().':'.$p->sampai->toDateString();
         $ttl = $p->sampai->isToday() ? 300 : 3600;
 
         return Cache::remember($kunci, $ttl, fn () => $this->hitung($p, $subIds));
@@ -89,9 +90,11 @@ class RekapService
                 $st['kering'] = max($st['kering'], $b['kering']);
                 $st['puso'] = max($st['puso'], $b['puso']);
                 $st['panen'] = max($st['panen'], $b['panen']);
-                $st['debit'] += $b['debit'];
-                $st['debit_n']++;
-                $st['debit_min'] = $st['debit_min'] === null ? $b['debit'] : min($st['debit_min'], $b['debit']);
+                if ($b['debit'] !== null) { // laporan tanaman baru tidak berisi debit
+                    $st['debit'] += $b['debit'];
+                    $st['debit_n']++;
+                    $st['debit_min'] = $st['debit_min'] === null ? $b['debit'] : min($st['debit_min'], $b['debit']);
+                }
             }
             $statSub[] = $st + ['sub' => $subId, 'petak' => $petak]; // satu baris per unit laporan (Sub-D.I. atau petak tersier)
 
@@ -143,11 +146,40 @@ class RekapService
                 'kode' => SK::URUTAN[SK::dariNilai($r->kondisi_saluran, $tanam, $kering, $puso)],
                 'tanam' => $tanam, 'kering' => $kering, 'puso' => $puso,
                 'padi' => (float) $r->luas_padi_ha, 'palawija' => (float) $r->luas_palawija_ha, 'horti' => (float) $r->luas_horti_ha,
-                'panen' => (float) $r->luas_panen_ha, 'debit' => (float) $r->debit_intake_lps,
+                'panen' => (float) $r->luas_panen_ha, 'debit' => $r->debit_intake_lps === null ? null : (float) $r->debit_intake_lps,
             ];
         }
         if ($subKini !== null) {
             $proses($subKini, $baris, $petakKini);
+        }
+
+        // ---------- laporan air Manager: kondisi saluran ikut status harian D.I.; debit dari intake & sungai ----------
+        $statAir = [];
+        $airPerDi = LaporanAir::query()->toBase()
+            ->select(['daerah_irigasi_id', 'tanggal', 'kondisi_saluran', 'debit_intake_lps', 'debit_sungai_m3s'])
+            ->whereBetween('tanggal', [$p->dari->copy()->subDays(SK::MASA_BERLAKU_HARI - 1)->toDateString(), $p->sampai->toDateString()])
+            ->whereIn('daerah_irigasi_id', $diList->pluck('id'))
+            ->orderBy('tanggal')->get()->groupBy('daerah_irigasi_id');
+        foreach ($airPerDi as $diId => $daftar) {
+            $baris = $daftar->map(fn ($r) => ['tanggal' => substr((string) $r->tanggal, 0, 10), 'kode' => SK::URUTAN[SK::dariSaluran($r->kondisi_saluran)]])->values()->all();
+            $k = -1;
+            for ($i = 0; $i < $n; $i++) {
+                while ($k + 1 < count($baris) && $baris[$k + 1]['tanggal'] <= $hari[$i]) {
+                    $k++;
+                }
+                if ($k >= 0 && (strtotime($hari[$i]) - strtotime($baris[$k]['tanggal'])) / 86400 < SK::MASA_BERLAKU_HARI && $baris[$k]['kode'] > $diHari[$diId][$i]) {
+                    $diHari[$diId][$i] = $baris[$k]['kode'];
+                }
+            }
+            $dalam = $daftar->filter(fn ($r) => substr((string) $r->tanggal, 0, 10) >= $p->dari->toDateString());
+            $sungai = $dalam->pluck('debit_sungai_m3s')->filter(fn ($v) => $v !== null)->map(fn ($v) => (float) $v);
+            $statAir[$diId] = [
+                'n' => $dalam->count(),
+                'intake_rata' => $dalam->isNotEmpty() ? round($dalam->avg(fn ($r) => (float) $r->debit_intake_lps), 1) : null,
+                'intake_min' => $dalam->isNotEmpty() ? round($dalam->min(fn ($r) => (float) $r->debit_intake_lps), 1) : null,
+                'sungai_rata' => $sungai->isNotEmpty() ? round($sungai->avg(), 3) : null,
+                'sungai_min' => $sungai->isNotEmpty() ? round($sungai->min(), 3) : null,
+            ];
         }
 
         // ---------- per D.I. ----------
@@ -189,8 +221,12 @@ class RekapService
                 'puncak_padi_ha' => round($st->sum('padi'), 2), 'puncak_palawija_ha' => round($st->sum('palawija'), 2), 'puncak_horti_ha' => round($st->sum('horti'), 2),
                 'puncak_kering_ha' => round($st->sum('kering'), 2),
                 'puncak_puso_ha' => round($st->sum('puso'), 2), 'puncak_panen_ha' => round($st->sum('panen'), 2),
-                'debit_rata_lps' => $debitN ? round($st->sum('debit') / $debitN, 1) : null,
-                'debit_min_lps' => $st->whereNotNull('debit_min')->min('debit_min'),
+                // debit intake dari laporan air Manager; laporan lama (sebelum dipisah) sebagai cadangan
+                'debit_rata_lps' => ($statAir[$d->id]['n'] ?? 0) ? $statAir[$d->id]['intake_rata'] : ($debitN ? round($st->sum('debit') / $debitN, 1) : null),
+                'debit_min_lps' => ($statAir[$d->id]['n'] ?? 0) ? $statAir[$d->id]['intake_min'] : $st->whereNotNull('debit_min')->min('debit_min'),
+                'debit_sungai_rata_m3s' => $statAir[$d->id]['sungai_rata'] ?? null,
+                'debit_sungai_min_m3s' => $statAir[$d->id]['sungai_min'] ?? null,
+                'laporan_air' => $statAir[$d->id]['n'] ?? 0,
             ];
         }
 

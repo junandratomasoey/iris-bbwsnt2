@@ -18,9 +18,14 @@ final class Izin
 
     public const DAFTAR = [
         'lapor' => [
-            'grup' => 'form', 'label' => 'Isi laporan harian (kondisi tanaman)',
-            'ket' => 'Tugas PPA: kondisi air & tanaman per petak tersier. Manager mengisi pembacaan pintu, bukan laporan ini.',
-            'bawaan' => [Role::PETUGAS, Role::POB, Role::ADMIN_OP],
+            'grup' => 'form', 'label' => 'Isi laporan tanaman',
+            'ket' => 'Tugas PPA/petugas lapangan: kondisi tanaman per petak tersier, foto, catatan, titik GPS.',
+            'bawaan' => [Role::PETUGAS, Role::ADMIN_OP],
+        ],
+        'lapor-air' => [
+            'grup' => 'form', 'label' => 'Isi laporan air (sungai, intake & saluran)',
+            'ket' => 'Tugas Manager: debit & TMA sungai dan intake, kondisi saluran, foto, catatan, titik GPS per D.I.',
+            'bawaan' => [Role::MANAGER, Role::ADMIN_OP],
         ],
         'isi-pintu' => [
             'grup' => 'form', 'label' => 'Isi pembacaan pintu air',
@@ -69,8 +74,8 @@ final class Izin
         ],
         'kelola-petugas' => [
             'grup' => 'sistem', 'label' => 'Tambah/ubah kontak petugas',
-            'ket' => 'Akun petugas & POB di wilayahnya, reset password.',
-            'bawaan' => [Role::ADMIN_OP, Role::KOORDINATOR, Role::MANAGER],
+            'ket' => 'Akun petugas & POB di wilayahnya, reset password. Pimpinan/Admin OP juga mengatur D.I. & Sub-D.I. Manager.',
+            'bawaan' => [Role::PIMPINAN, Role::ADMIN_OP, Role::KOORDINATOR, Role::MANAGER],
         ],
         'kelola-pengguna' => [
             'grup' => 'sistem', 'label' => 'Kelola semua akun pengguna',
@@ -81,11 +86,6 @@ final class Izin
             'grup' => 'sistem', 'label' => 'Unduh rekap & ekspor CSV',
             'ket' => 'Rekap periode dan ekspor laporan harian.',
             'bawaan' => [Role::PIMPINAN, Role::ADMIN_OP, Role::KOORDINATOR, Role::MANAGER, Role::PETUGAS, Role::POB],
-        ],
-        'lihat-audit' => [
-            'grup' => 'sistem', 'label' => 'Lihat log aktivitas',
-            'ket' => 'Riwayat perubahan data oleh semua pengguna.',
-            'bawaan' => [],
         ],
     ];
 

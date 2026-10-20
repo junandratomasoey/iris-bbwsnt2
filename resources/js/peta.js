@@ -47,9 +47,9 @@ function popupSub(s) {
         ${chip(s.status_label, s.warna)}
         ${l ? `<table style="margin-top:6px;width:100%">
             <tr><td style="color:#4A585E">Tanggal</td><td style="text-align:right">${esc(l.tanggal)}</td></tr>
-            <tr><td style="color:#4A585E">Debit intake</td><td style="text-align:right">${fmt(l.debit, 1)} L/dt</td></tr>
-            <tr><td style="color:#4A585E">TMA</td><td style="text-align:right">${fmt(l.tma, 1)} cm</td></tr>
-            <tr><td style="color:#4A585E">Saluran</td><td style="text-align:right">${esc(l.kondisi)}</td></tr>
+            ${l.debit !== null && l.debit !== undefined ? `<tr><td style="color:#4A585E">Debit intake</td><td style="text-align:right">${fmt(l.debit, 1)} L/dt</td></tr>` : ''}
+            ${l.tma !== null && l.tma !== undefined ? `<tr><td style="color:#4A585E">TMA</td><td style="text-align:right">${fmt(l.tma, 1)} cm</td></tr>` : ''}
+            ${l.kondisi ? `<tr><td style="color:#4A585E">Saluran</td><td style="text-align:right">${esc(l.kondisi)}</td></tr>` : ''}
             <tr><td style="color:#4A585E">Tanam / kering / puso</td><td style="text-align:right">${fmt(l.tanam, 1)} / ${fmt(l.kering, 1)} / ${fmt(l.puso, 1)} Ha</td></tr>
         </table>${foto}
         <a href="${l.url}" style="display:inline-block;margin-top:6px;font-weight:600;color:#0F5E6E">Detail laporan</a>` : '<div style="margin-top:6px;color:#7C898E">Belum ada laporan 3 hari terakhir.</div>'}

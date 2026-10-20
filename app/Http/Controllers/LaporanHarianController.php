@@ -49,10 +49,10 @@ class LaporanHarianController extends Controller
         ]);
         // isian awal dari laporan terakhir sub tersebut agar petugas cukup mengubah yang berbeda
         $sebelumnya = $laporan->sub_daerah_irigasi_id
-            ? LaporanHarian::where('sub_daerah_irigasi_id', $laporan->sub_daerah_irigasi_id)->latest('tanggal')->first()
+            ? LaporanHarian::where('sub_daerah_irigasi_id', $laporan->sub_daerah_irigasi_id)->when($request->integer('petak'), fn ($q, $p) => $q->where('pintu_air_id', $p))->latest('tanggal')->first()
             : null;
         if ($sebelumnya) {
-            $laporan->fill($sebelumnya->only(['debit_intake_lps', 'tma_cm', 'kondisi_saluran', 'bukaan_pintu_persen', 'fase_tanaman', 'luas_tanam_ha',
+            $laporan->fill($sebelumnya->only(['fase_tanaman', 'luas_tanam_ha',
                 'luas_padi_ha', 'luas_palawija_ha', 'luas_horti_ha', 'jenis_palawija', 'jenis_horti', 'luas_hijau_ha', 'luas_kering_ha', 'luas_panen_ha', 'luas_puso_ha']));
         }
 
@@ -262,10 +262,6 @@ class LaporanHarianController extends Controller
                     ->where('petak_kunci', $petakKunci))->ignore($laporan?->id),
             ],
             'pintu_air_id' => [Rule::requiredIf($wajibPetak), 'nullable', 'integer', Rule::in($idPetak)],
-            'debit_intake_lps' => ['required', 'numeric', 'min:0', 'max:100000'],
-            'tma_cm' => ['required', 'numeric', 'min:-1000', 'max:100000'],
-            'kondisi_saluran' => ['required', Rule::in(array_keys(LaporanHarian::KONDISI))],
-            'bukaan_pintu_persen' => ['nullable', 'integer', 'between:0,100'],
             'fase_tanaman' => ['nullable', Rule::in(array_keys(LaporanHarian::FASE))],
             'luas_tanam_ha' => ['required', 'numeric', 'min:0', 'max:20000'],
             'luas_padi_ha' => ['nullable', 'numeric', 'min:0', 'max:20000'],

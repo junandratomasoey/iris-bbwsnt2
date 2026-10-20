@@ -29,5 +29,7 @@ class AppServiceProvider extends ServiceProvider
         }
         // halaman Hak akses hanya Super Admin (tidak bisa dicabut agar tidak ada yang terkunci keluar)
         Gate::define('kelola-hak-akses', fn (User $u) => $u->hasRole(Role::SUPER_ADMIN));
+        // log aktivitas hanya Super Admin (tidak bisa diatur di Hak akses)
+        Gate::define('lihat-audit', fn (User $u) => $u->hasRole(Role::SUPER_ADMIN));
     }
 }

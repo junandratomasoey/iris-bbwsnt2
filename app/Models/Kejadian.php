@@ -55,4 +55,21 @@ class Kejadian extends Model
     {
         return $this->morphMany(Foto::class, 'fotoable');
     }
+
+    /**
+     * Kejadian dalam jangkauan user: semua untuk Super Admin/Pimpinan/Admin OP;
+     * selain itu kejadian di D.I. wilayahnya, atau kejadian tanpa D.I. di kabupaten D.I. tersebut.
+     */
+    public function scopeTerjangkau(\Illuminate\Database\Eloquent\Builder $q, User $u): \Illuminate\Database\Eloquent\Builder
+    {
+        $diIds = $u->diIdsTerjangkau();
+        if ($diIds === null) {
+            return $q;
+        }
+        $kab = DaerahIrigasi::whereIn('id', $diIds)->whereNotNull('kabupaten_id')->distinct()->pluck('kabupaten_id');
+
+        return $q->where(fn ($w) => $w->whereIn('daerah_irigasi_id', $diIds)
+            ->orWhere(fn ($x) => $x->whereNull('daerah_irigasi_id')->whereIn('kabupaten_id', $kab))
+            ->orWhere('user_id', $u->id));
+    }
 }

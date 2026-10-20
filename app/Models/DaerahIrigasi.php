@@ -34,6 +34,7 @@ class DaerahIrigasi extends Model
             $di->foto()->get()->each->delete();
             $di->skemaJaringan()->get()->each->delete();
             SesiPintu::where('daerah_irigasi_id', $di->id)->get()->each->delete();
+            LaporanAir::where('daerah_irigasi_id', $di->id)->get()->each->delete();
         });
     }
 
@@ -60,6 +61,11 @@ class DaerahIrigasi extends Model
     public function skemaJaringan(): HasMany
     {
         return $this->hasMany(SkemaJaringan::class)->latest('id');
+    }
+
+    public function laporanAir(): HasMany
+    {
+        return $this->hasMany(LaporanAir::class);
     }
 
     public function jadwalTanam(): HasMany

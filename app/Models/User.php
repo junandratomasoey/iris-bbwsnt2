@@ -128,6 +128,11 @@ class User extends Authenticatable
             if ($this->hasRole(Role::KOORDINATOR) && $this->wilayah_satgas_id) {
                 $q->whereHas('daerahIrigasi.kabupaten', fn ($k) => $k->where('wilayah_satgas_id', $this->wilayah_satgas_id));
             } elseif ($this->hasRole(Role::MANAGER) && $this->daerah_irigasi_id) {
+                // Manager: Sub-D.I. yang dicentang untuknya; bila tidak ada, seluruh Sub-D.I. di D.I.-nya
+                $ids = $this->subDaerahIrigasi()->pluck('sub_daerah_irigasi.id')->all();
+                if ($ids) {
+                    return $ids;
+                }
                 $q->where('daerah_irigasi_id', $this->daerah_irigasi_id);
             } else {
                 $ids = $this->subDaerahIrigasi()->pluck('sub_daerah_irigasi.id')->all();

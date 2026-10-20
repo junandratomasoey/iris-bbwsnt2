@@ -72,7 +72,7 @@ class HakAksesTest extends TestCase
             ->assertSessionHas('ok', 'Hak akses jabatan disimpan (2 perubahan).');
 
         $this->actingAs($this->segar($this->petugas))->get(route('laporan.create'))->assertForbidden();
-        $this->actingAs($this->segar($this->pob))->get(route('laporan.create'))->assertOk();
+        $this->actingAs($this->segar($this->admin))->get(route('laporan.create'))->assertOk();
         $this->actingAs($this->segar($this->pimpinan))->get(route('kejadian.create'))->assertOk();
         $this->assertTrue($this->segar($this->sa)->can('lapor'));   // Super Admin tidak terpengaruh
 
@@ -82,14 +82,20 @@ class HakAksesTest extends TestCase
 
     public function test_pengecualian_per_orang_menimpa_jabatan(): void
     {
-        $this->actingAs($this->sa)->post(route('hak-akses.pengecualian.store'), ['user_id' => $this->pob->id, 'izin' => 'lapor', 'boleh' => 0, 'alasan' => 'Khusus pintu air'])
+        // laporan tanaman bawaannya hanya PPA; satu POB diberi izin khusus
+        $this->actingAs($this->pob)->get(route('laporan.create'))->assertForbidden();
+        $this->actingAs($this->sa)->post(route('hak-akses.pengecualian.store'), ['user_id' => $this->pob->id, 'izin' => 'lapor', 'boleh' => 1, 'alasan' => 'Merangkap PPA'])
             ->assertSessionHasNoErrors();
         $this->actingAs($this->sa)->post(route('hak-akses.pengecualian.store'), ['user_id' => $this->petugas->id, 'izin' => 'verifikasi', 'boleh' => 1]);
 
-        $this->actingAs($this->segar($this->pob))->get(route('laporan.create'))->assertForbidden();
+        $this->actingAs($this->segar($this->pob))->get(route('laporan.create'))->assertOk();
         $this->actingAs($this->segar($this->pob))->get(route('pembacaan-pintu.create'))->assertOk();   // izin lain tetap
         $this->assertTrue($this->segar($this->petugas)->can('verifikasi'));
+        // log aktivitas: hanya Super Admin, tidak bisa diberikan lewat pengecualian
         $this->assertFalse($this->segar($this->admin)->can('lihat-audit'));
+        $this->actingAs($this->sa)->post(route('hak-akses.pengecualian.store'), ['user_id' => $this->admin->id, 'izin' => 'lihat-audit', 'boleh' => 1])->assertSessionHasErrors('izin');
+        $this->actingAs($this->admin)->get(route('audit'))->assertForbidden();
+        $this->actingAs($this->sa)->get(route('audit'))->assertOk();
 
         // pengecualian yang sama dengan jabatan tidak disimpan
         $this->actingAs($this->sa)->post(route('hak-akses.pengecualian.store'), ['user_id' => $this->admin->id, 'izin' => 'lapor', 'boleh' => 1]);
@@ -99,7 +105,7 @@ class HakAksesTest extends TestCase
             ->assertSessionHasErrors('user_id');
 
         $this->actingAs($this->sa)->delete(route('hak-akses.pengecualian.destroy', IzinPengguna::where('user_id', $this->pob->id)->first()));
-        $this->actingAs($this->segar($this->pob))->get(route('laporan.create'))->assertOk();
+        $this->actingAs($this->segar($this->pob))->get(route('laporan.create'))->assertForbidden();
     }
 
     public function test_menu_infrastruktur_peta_batas_p3a_hanya_pimpinan_dan_admin(): void

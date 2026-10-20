@@ -91,11 +91,14 @@ class DashboardController extends Controller
         $kejadian = Kejadian::selectRaw('status_penanganan, count(*) as jumlah, sum(luas_terdampak_ha) as luas, sum(luas_tertangani_ha) as tertangani')
             ->groupBy('status_penanganan')->get()->keyBy('status_penanganan');
 
+        $diIds = $user->diIdsTerjangkau();
+        $airHariIni = \App\Models\LaporanAir::whereDate('tanggal', $hari)->when($diIds !== null, fn ($q) => $q->whereIn('daerah_irigasi_id', $diIds))->count();
+        $totalDi = $diIds === null ? \App\Models\DaerahIrigasi::count() : count($diIds);
         $svcPintu = app(PintuService::class);
         $pintu = $svcPintu->hitung($svcPintu->daftar($subIds, null, 2));
 
         return view('dashboard.index', compact(
-            'pintu', 'ringkasan', 'perStatus', 'luasPerStatus', 'totalSub', 'laporHariIni', 'kritis', 'kepatuhan', 'menunggu', 'kejadian', 'hari', 'periode'
+            'pintu', 'airHariIni', 'totalDi', 'ringkasan', 'perStatus', 'luasPerStatus', 'totalSub', 'laporHariIni', 'kritis', 'kepatuhan', 'menunggu', 'kejadian', 'hari', 'periode'
         ));
     }
 }

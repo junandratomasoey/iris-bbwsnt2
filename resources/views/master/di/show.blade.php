@@ -70,7 +70,7 @@
             <div class="flex justify-between"><dt class="text-basalt-soft">Fungsional (SHP)</dt><dd>{{ angka($di->luas_fungsional_ha) }} Ha</dd></div>
             <div class="flex justify-between"><dt class="text-basalt-soft">MT berjalan</dt><dd>{{ $ring['mt'] ?? 'Belum dijadwalkan' }}</dd></div>
             <div class="flex justify-between"><dt class="text-basalt-soft">Melapor (3 hari)</dt><dd>{{ $ring['sub_lapor'] ?? 0 }}/{{ $ring['jumlah_sub'] ?? 0 }} Sub-D.I.</dd></div>
-            <div class="flex justify-between"><dt class="text-basalt-soft">Total debit intake</dt><dd>{{ angka($ring['debit_total_lps'] ?? 0, 1) }} L/dt</dd></div>
+            <div class="flex justify-between"><dt class="text-basalt-soft">Debit intake (laporan air)</dt><dd>{{ angka($ring['debit_total_lps'] ?? 0, 1) }} L/dt</dd></div>
         </dl>
         @if($di->tenaga_op)
             <p class="mt-4 text-xs font-semibold text-basalt-soft">Tenaga O&amp;P (Permen)</p>
@@ -91,7 +91,7 @@
                         <td class="font-medium">{{ $s->nama }}@if($s->lokasi)<div class="text-xs text-basalt-mute">{{ $s->lokasi }}</div>@endif</td>
                         <td class="text-right tabular-nums">{{ angka($s->luas_ha) }}</td>
                         <td><x-status :s="SK::dariLaporan($l)"/></td>
-                        <td class="text-xs">@if($l)<a href="{{ route('laporan.show', $l) }}" class="text-saluran-600 hover:underline">{{ $l->tanggal->translatedFormat('d M') }} · {{ angka($l->debit_intake_lps, 1) }} L/dt</a>@else – @endif</td>
+                        <td class="text-xs">@if($l)<a href="{{ route('laporan.show', $l) }}" class="text-saluran-600 hover:underline">{{ $l->tanggal->translatedFormat('d M') }} · kering {{ angka($l->luas_kering_ha, 1) }}/{{ angka($l->luas_tanam_ha, 1) }} Ha</a>@else – @endif</td>
                         <td class="text-xs">@foreach($s->petugas->take(3) as $p)<div class="flex items-center gap-1">{{ $p->name }}@if($p->waLink())<a href="{{ $p->waLink() }}" target="_blank" rel="noopener" class="font-semibold text-[#1f8f4e]">WA</a>@endif</div>@endforeach @if($s->petugas->count() > 3)<span class="text-basalt-mute">+{{ $s->petugas->count() - 3 }} lagi</span>@endif</td>
                         <td class="text-xs">{{ $s->lat ? 'Ada' : 'Belum' }}</td>
                         @if($kelola)<td><a href="{{ route('master.sub.edit', $s) }}" class="text-xs font-medium text-saluran-600">Ubah</a></td>@endif
@@ -107,14 +107,14 @@
     <section class="panel p-5">
         <h2 class="text-lg font-semibold">Tren 30 hari</h2>
         @if($tren->count() < 2)
-            <p class="mt-2 text-sm text-basalt-soft">Grafik muncul setelah ada laporan di minimal dua tanggal.</p>
+            <p class="mt-2 text-sm text-basalt-soft">Grafik muncul setelah ada laporan air Manager di minimal dua tanggal.</p>
         @else
-            @php $mx = max(1, $tren->max('debit')); @endphp
-            <p class="mt-1 text-xs text-basalt-soft">Total debit intake harian (L/dt) dari Sub-D.I. yang melapor.</p>
-            <div class="mt-3 flex h-32 items-end gap-0.5" role="img" aria-label="Tren debit 30 hari">
-                @foreach($tren as $t)<div class="flex-1 rounded-t bg-saluran-500" style="height: {{ max(2, $t->debit / $mx * 100) }}%" title="{{ \Carbon\Carbon::parse($t->tanggal)->format('d/m') }}: {{ angka($t->debit, 1) }} L/dt, {{ $t->n }} laporan"></div>@endforeach
+            @php $mx = max(1, $tren->max('debit_intake_lps')); @endphp
+            <p class="mt-1 text-xs text-basalt-soft">Debit intake harian (L/dt) dari laporan air Manager; warna = kondisi saluran.</p>
+            <div class="mt-3 flex h-32 items-end gap-0.5" role="img" aria-label="Tren debit intake 30 hari">
+                @foreach($tren as $t)<div class="flex-1 rounded-t" style="height: {{ max(2, $t->debit_intake_lps / $mx * 100) }}%; background: {{ SK::WARNA[$t->status()] }}" title="{{ $t->tanggal->format('d/m') }}: intake {{ angka_r($t->debit_intake_lps) }} L/dt{{ $t->debit_sungai_m3s !== null ? ', sungai '.angka_r($t->debit_sungai_m3s).' m³/dt' : '' }}"></div>@endforeach
             </div>
-            <div class="mt-1 flex justify-between text-[10px] text-basalt-mute"><span>{{ \Carbon\Carbon::parse($tren->first()->tanggal)->format('d/m') }}</span><span>{{ \Carbon\Carbon::parse($tren->last()->tanggal)->format('d/m') }}</span></div>
+            <div class="mt-1 flex justify-between text-[10px] text-basalt-mute"><span>{{ $tren->first()->tanggal->format('d/m') }}</span><span>{{ $tren->last()->tanggal->format('d/m') }}</span></div>
         @endif
     </section>
     <section class="panel p-5">

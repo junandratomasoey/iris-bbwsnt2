@@ -8,6 +8,8 @@ export function pickLocation(opsi) {
     return {
         lat: opsi.lat ?? '',
         lng: opsi.lng ?? '',
+        akurasi: null,
+        gpsStatus: 'idle',
         init() {
             const pusat = this.lat && this.lng ? [+this.lat, +this.lng] : (opsi.pusat || [-9.6, 122.0]);
             map = L.map(this.$refs.peta, { scrollWheelZoom: false }).setView(pusat, this.lat ? 13 : (opsi.pusat ? 11 : 7));
@@ -20,6 +22,7 @@ export function pickLocation(opsi) {
             });
             this.$watch('lat', () => this.pasang());
             this.$watch('lng', () => this.pasang());
+            if (opsi.otomatis && !this.lat) this.gpsSaya();
         },
         pasang() {
             if (!this.lat || !this.lng || isNaN(+this.lat) || isNaN(+this.lng)) return;
@@ -28,11 +31,15 @@ export function pickLocation(opsi) {
             else penanda = L.circleMarker(ll, { radius: 8, color: '#fff', weight: 2, fillColor: '#D9622B', fillOpacity: 1 }).addTo(map);
         },
         gpsSaya() {
-            navigator.geolocation?.getCurrentPosition((p) => {
+            if (!navigator.geolocation) { this.gpsStatus = 'gagal'; return; }
+            this.gpsStatus = 'mencari';
+            navigator.geolocation.getCurrentPosition((p) => {
                 this.lat = p.coords.latitude.toFixed(7);
                 this.lng = p.coords.longitude.toFixed(7);
+                this.akurasi = Math.round(p.coords.accuracy);
+                this.gpsStatus = 'ok';
                 map.setView([+this.lat, +this.lng], 15);
-            });
+            }, () => { this.gpsStatus = 'gagal'; }, { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 });
         },
     };
 }

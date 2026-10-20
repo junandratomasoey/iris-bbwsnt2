@@ -62,7 +62,7 @@ class FotoKejadianTest extends TestCase
     {
         $lain = User::create(['name' => 'Lain', 'username' => 'lain', 'password' => 'x', 'role' => Role::PETUGAS, 'must_change_password' => false]);
         $this->actingAs($lain)->post(route('kejadian.foto.store', $this->kejadian), ['jenis_foto' => 'sebelum', 'foto' => [UploadedFile::fake()->image('a.jpg')]])->assertForbidden();
-        $this->actingAs($lain)->get(route('kejadian.show', $this->kejadian))->assertOk()->assertDontSee('Tambah foto');
+        $this->actingAs($lain)->get(route('kejadian.show', $this->kejadian))->assertForbidden();   // di luar wilayahnya: tidak bisa dibuka
     }
 
     public function test_kuota_foto_dibatasi(): void

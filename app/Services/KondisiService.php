@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\DaerahIrigasi;
+use App\Models\LaporanAir;
 use App\Models\LaporanHarian;
 use App\Models\SubDaerahIrigasi;
 use App\Support\StatusKondisi;
@@ -55,10 +56,13 @@ class KondisiService
         }
 
         $g = clone $terbaru;
-        foreach (['luas_tanam_ha', 'luas_padi_ha', 'luas_palawija_ha', 'luas_horti_ha', 'luas_hijau_ha', 'luas_kering_ha', 'luas_panen_ha', 'luas_puso_ha', 'debit_intake_lps'] as $k) {
+        foreach (['luas_tanam_ha', 'luas_padi_ha', 'luas_palawija_ha', 'luas_horti_ha', 'luas_hijau_ha', 'luas_kering_ha', 'luas_panen_ha', 'luas_puso_ha'] as $k) {
             $g->setAttribute($k, round($unit->sum(fn ($l) => (float) $l->$k), 2));
         }
-        $g->setAttribute('tma_cm', round($unit->avg(fn ($l) => (float) $l->tma_cm), 1));
+        // data air hanya ada di laporan lama (sebelum laporan air dipisah ke Manager)
+        $berair = $unit->filter(fn ($l) => $l->debit_intake_lps !== null);
+        $g->setAttribute('debit_intake_lps', $berair->isNotEmpty() ? round($berair->sum(fn ($l) => (float) $l->debit_intake_lps), 2) : null);
+        $g->setAttribute('tma_cm', $berair->isNotEmpty() ? round($berair->avg(fn ($l) => (float) $l->tma_cm), 1) : null);
         $g->setAttribute('kondisi_saluran', $unit->pluck('kondisi_saluran')->sortBy(fn ($k) => self::URUT_SALURAN[$k] ?? -1)->last());
         $g->setAttribute('jenis_palawija', $unit->pluck('jenis_palawija')->filter()->flatMap(fn ($j) => array_map('trim', explode(',', $j)))->unique()->implode(', ') ?: null);
         $g->setAttribute('jenis_horti', $unit->pluck('jenis_horti')->filter()->flatMap(fn ($j) => array_map('trim', explode(',', $j)))->unique()->implode(', ') ?: null);
@@ -76,8 +80,22 @@ class KondisiService
         return [
             'laporan_id' => $l->id, 'kode' => $l->petak?->kode, 'nama' => $l->petak?->nama, 'tanggal' => $l->tanggal->toDateString(),
             'status' => $st, 'tanam' => (float) $l->luas_tanam_ha, 'kering' => (float) $l->luas_kering_ha, 'puso' => (float) $l->luas_puso_ha,
-            'kondisi' => $l->kondisi_saluran, 'debit' => (float) $l->debit_intake_lps,
+            'kondisi' => $l->kondisi_saluran, 'debit' => $l->debit_intake_lps === null ? null : (float) $l->debit_intake_lps,
         ];
+    }
+
+    /**
+     * Laporan air (Manager) terakhir per D.I. yang masih berlaku (key = D.I. id).
+     *
+     * @return Collection<int, LaporanAir>
+     */
+    public function airTerkini(Carbon $tanggal, ?array $diIds = null): Collection
+    {
+        $dari = $tanggal->copy()->subDays(StatusKondisi::MASA_BERLAKU_HARI - 1)->toDateString();
+
+        return LaporanAir::query()->whereBetween('tanggal', [$dari, $tanggal->toDateString()])
+            ->when($diIds !== null, fn ($q) => $q->whereIn('daerah_irigasi_id', $diIds))
+            ->orderBy('tanggal')->orderBy('id')->get()->keyBy('daerah_irigasi_id');
     }
 
     /**
@@ -96,8 +114,9 @@ class KondisiService
         $diList = DaerahIrigasi::with(['kabupaten.wilayahSatgas', 'jadwalTanam'])
             ->when($subIds !== null, fn ($q) => $q->whereIn('id', $subs->keys()))
             ->orderBy('kode')->get();
+        $airSemua = $this->airTerkini($tanggal, $subIds !== null ? $subs->keys()->all() : null);
 
-        return $diList->mapWithKeys(function (DaerahIrigasi $di) use ($subs, $laporan, $tanggal) {
+        return $diList->mapWithKeys(function (DaerahIrigasi $di) use ($subs, $laporan, $tanggal, $airSemua) {
             $daftar = $subs->get($di->id, collect());
             $status = StatusKondisi::KOSONG;
             $agg = ['tanam' => 0, 'kering' => 0, 'puso' => 0, 'panen' => 0, 'debit' => 0, 'lapor' => 0, 'padi' => 0, 'palawija' => 0, 'horti' => 0];
@@ -123,6 +142,12 @@ class KondisiService
                 $terakhir = max($terakhir, $l->tanggal->toDateString());
             }
             $mt = $di->mtBerjalan($tanggal);
+            // kondisi saluran dari laporan air Manager ikut menentukan status D.I.
+            $air = $airSemua->get($di->id);
+            if ($air) {
+                $status = StatusKondisi::maks($status, $air->status());
+                $terakhir = max($terakhir, $air->tanggal->toDateString());
+            }
 
             return [$di->id => [
                 'id' => $di->id,
@@ -147,7 +172,12 @@ class KondisiService
                 'luas_kering_ha' => round($agg['kering'], 2),
                 'luas_puso_ha' => round($agg['puso'], 2),
                 'luas_panen_ha' => round($agg['panen'], 2),
-                'debit_total_lps' => round($agg['debit'], 1),
+                'debit_total_lps' => $air ? round($air->debit_intake_lps, 1) : round($agg['debit'], 1),
+                'air' => $air ? [
+                    'tanggal' => $air->tanggal->toDateString(), 'kondisi' => $air->kondisi_saluran, 'status' => $air->status(),
+                    'debit_sungai_m3s' => $air->debit_sungai_m3s, 'tma_sungai_cm' => $air->tma_sungai_cm,
+                    'debit_intake_lps' => $air->debit_intake_lps, 'tma_intake_cm' => $air->tma_intake_cm, 'id' => $air->id,
+                ] : null,
                 'laporan_terakhir' => $terakhir,
                 'mt' => $mt?->label,
             ]];

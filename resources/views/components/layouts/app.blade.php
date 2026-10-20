@@ -37,11 +37,16 @@
         <a href="{{ route('dashboard') }}"><x-logo /></a>
         <button type="button" class="rounded p-1.5 hover:bg-saluran-700 lg:hidden" @click="nav = false" aria-label="Tutup menu"><x-ikon n="tutup"/></button>
     </div>
-    @if($u->can('lapor') || $u->can('isi-pintu'))
+    @if($u->can('lapor') || $u->can('lapor-air') || $u->can('isi-pintu'))
         <div class="space-y-2 px-3 pb-3">
+            @can('lapor-air')
+                <a href="{{ route('laporan-air.create') }}" class="flex items-center justify-center gap-2 rounded-md bg-white px-3 py-2.5 text-sm font-semibold text-saluran-700 hover:bg-saluran-50">
+                    <x-ikon n="di"/> Isi laporan air
+                </a>
+            @endcan
             @can('lapor')
                 <a href="{{ route('laporan.create') }}" class="flex items-center justify-center gap-2 rounded-md bg-white px-3 py-2.5 text-sm font-semibold text-saluran-700 hover:bg-saluran-50">
-                    <x-ikon n="tambah"/> Isi laporan hari ini
+                    <x-ikon n="tambah"/> Isi laporan tanaman
                 </a>
             @endcan
             @can('isi-pintu')
@@ -54,7 +59,7 @@
     <nav class="flex-1 space-y-0.5 overflow-y-auto px-3" aria-label="Menu utama">
         @foreach($menu as [$route, $label, $ikon, $tampil])
             @continue(! $tampil)
-            @php $aktif = request()->routeIs(str_replace('.index', '', $route).'*'); @endphp
+            @php $aktif = request()->routeIs(str_replace('.index', '', $route).'*') || ($route === 'laporan.index' && request()->routeIs('laporan-air*')); @endphp
             <a href="{{ route($route) }}" @class(['nav-link', 'active' => $aktif]) @if($aktif) aria-current="page" @endif>
                 <x-ikon :n="$ikon"/> {{ $label }}
             </a>

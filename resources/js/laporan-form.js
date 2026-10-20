@@ -26,12 +26,7 @@ export function laporanForm(opsi) {
         get daftarPetak() { return this.petakSub[this.f.sub_daerah_irigasi_id]?.daftar || []; },
         get petakWajib() { return !!this.petakSub[this.f.sub_daerah_irigasi_id]?.wajib; },
         get petakTerpilih() { return this.daftarPetak.find((p) => String(p.id) === String(this.f.pintu_air_id)) || null; },
-        pakaiBacaan() {
-            const b = this.petakTerpilih?.bacaan;
-            if (!b) return;
-            if (b.debit !== null) this.f.debit_intake_lps = b.debit;
-            if (b.tma !== null) this.f.tma_cm = b.tma;
-        },
+
         f: opsi.awal,
         foto: [],          // {file, url, ukuran}
         memproses: false,
@@ -57,7 +52,8 @@ export function laporanForm(opsi) {
             const t = this.luasTanam;
             const rk = t > 0 ? (+this.f.luas_kering_ha || 0) / t : 0;
             if ((+this.f.luas_puso_ha || 0) > 0 || rk >= 0.5) return 'kritis';
-            let s = { penuh: 'aman', normal: 'aman', kurang: 'waspada', kering: 'siaga' }[this.f.kondisi_saluran] || 'kosong';
+            // laporan tanaman PPA tidak berisi kondisi saluran → dasar Aman, dinilai dari tanaman
+            let s = { penuh: 'aman', normal: 'aman', kurang: 'waspada', kering: 'siaga' }[this.f.kondisi_saluran] || 'aman';
             const urut = { kosong: 0, aman: 1, waspada: 2, siaga: 3, kritis: 4 };
             const naik = (a, b) => (urut[a] >= urut[b] ? a : b);
             if (rk >= 0.25) s = naik(s, 'siaga'); else if (rk >= 0.1) s = naik(s, 'waspada');

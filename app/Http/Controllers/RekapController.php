@@ -27,13 +27,14 @@ class RekapController extends Controller
             fputcsv($out, [], ';');
             fputcsv($out, ['Kode', 'D.I.', 'Kabupaten', 'Satgas', 'Luas fungsional (Ha)', 'Status terberat', 'Status tersering',
                 'Hari kritis', 'Hari siaga', 'Hari waspada', 'Hari aman', 'Hari tanpa laporan', 'Jumlah Sub-D.I.', 'Jumlah laporan', 'Kepatuhan lapor (%)',
-                'Puncak luas tanam (Ha)', 'Puncak padi (Ha)', 'Puncak palawija (Ha)', 'Puncak hortikultura (Ha)', 'Puncak tanaman kekeringan (Ha)', 'Puncak puso (Ha)', 'Puncak panen (Ha)', 'Debit rata-rata (L/dt)', 'Debit minimum (L/dt)'], ';');
+                'Puncak luas tanam (Ha)', 'Puncak padi (Ha)', 'Puncak palawija (Ha)', 'Puncak hortikultura (Ha)', 'Puncak tanaman kekeringan (Ha)', 'Puncak puso (Ha)', 'Puncak panen (Ha)', 'Debit intake rata-rata (L/dt)', 'Debit intake minimum (L/dt)', 'Debit sungai rata-rata (m3/dt)', 'Debit sungai minimum (m3/dt)', 'Jumlah laporan air'], ';');
             foreach (collect($r['di'])->sortBy('kode') as $d) {
                 fputcsv($out, [
                     $d['kode'], $d['nama'], $d['kabupaten'], $d['satgas'], $d['luas_ha'], SK::label($d['terberat']), SK::label($d['tersering']),
                     $d['hari']['kritis'], $d['hari']['siaga'], $d['hari']['waspada'], $d['hari']['aman'], $d['hari']['kosong'],
                     $d['jumlah_sub'], $d['laporan'], $d['kepatuhan'],
                     $d['puncak_tanam_ha'], $d['puncak_padi_ha'], $d['puncak_palawija_ha'], $d['puncak_horti_ha'], $d['puncak_kering_ha'], $d['puncak_puso_ha'], $d['puncak_panen_ha'], $d['debit_rata_lps'], $d['debit_min_lps'],
+                    $d['debit_sungai_rata_m3s'], $d['debit_sungai_min_m3s'], $d['laporan_air'],
                 ], ';');
             }
             $t = $r['total'];

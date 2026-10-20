@@ -35,7 +35,7 @@ class PetaController extends Controller
         $periode = Periode::dariRequest($request);
         $tgl = $periode->sampai;
         $di = $this->daftarDi($request, $periode, null)
-            ->map(fn ($d) => collect($d)->except(['sub_per_status', 'debit_total_lps', 'debit_rata_lps', 'debit_min_lps'])->all());
+            ->map(fn ($d) => collect($d)->except(['sub_per_status', 'debit_total_lps', 'debit_rata_lps', 'debit_min_lps', 'air', 'debit_sungai_rata_m3s', 'debit_sungai_min_m3s'])->all());
 
         $kejadian = Kejadian::with('kabupaten:id,nama', 'daerahIrigasi:id,nama', 'foto')->whereNotNull('lat')->get()->map(fn ($k) => [
             'id' => $k->id, 'di' => $k->daerahIrigasi?->nama,
@@ -80,8 +80,8 @@ class PetaController extends Controller
                     'luas_ha' => $s->luas_ha, 'lat' => $titik[0], 'lng' => $titik[1], 'titik_pasti' => $titik[2],
                     'status' => $st, 'status_label' => StatusKondisi::label($st), 'warna' => StatusKondisi::WARNA[$st],
                     'laporan' => $l ? [
-                        'id' => $l->id, 'tanggal' => $l->tanggal->translatedFormat('d M Y'), 'debit' => (float) $l->debit_intake_lps,
-                        'tma' => (float) $l->tma_cm, 'kondisi' => $l->kondisi_saluran, 'tanam' => (float) $l->luas_tanam_ha,
+                        'id' => $l->id, 'tanggal' => $l->tanggal->translatedFormat('d M Y'), 'debit' => $l->debit_intake_lps === null ? null : (float) $l->debit_intake_lps,
+                        'tma' => $l->tma_cm === null ? null : (float) $l->tma_cm, 'kondisi' => $l->kondisi_saluran, 'tanam' => (float) $l->luas_tanam_ha,
                         'kering' => (float) $l->luas_kering_ha, 'puso' => (float) $l->luas_puso_ha, 'pelapor' => $l->user?->name,
                         'foto' => $l->foto->take(3)->map(fn ($f) => ['kecil' => $f->url_kecil, 'besar' => $f->url])->values(), 'url' => route('laporan.show', $l),
                     ] : null,
@@ -138,7 +138,7 @@ class PetaController extends Controller
         if ($request->filled('sebelum')) {
             $sampai = $request->date('sebelum');
             $ids = $subIds ?? $di->subDaerahIrigasi()->pluck('id')->all();
-            $data = $this->detail->fotoHarian($ids, $sampai->startOfDay(), $internal);
+            $data = $this->detail->fotoHarian($ids, $sampai->startOfDay(), $internal, $di->id);
         } else {
             $data = $this->detail->data($di, Periode::dariRequest($request), $internal, $subIds);
             if ($internal) {

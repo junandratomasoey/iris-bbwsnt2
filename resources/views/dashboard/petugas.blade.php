@@ -65,7 +65,7 @@
             <a href="{{ route('laporan.show', $l) }}" class="flex items-center justify-between gap-3 px-4 py-3 hover:bg-savana">
                 <span>
                     <span class="block text-sm font-semibold">{{ $l->subDaerahIrigasi->nama }}@if($l->petak) · Petak {{ $l->petak->kode }}@endif</span>
-                    <span class="block text-xs text-basalt-soft">{{ $l->tanggal->translatedFormat('d M Y') }} · debit {{ angka($l->debit_intake_lps, 1) }} L/dt</span>
+                    <span class="block text-xs text-basalt-soft">{{ $l->tanggal->translatedFormat('d M Y') }} · kering {{ angka($l->luas_kering_ha, 1) }}/{{ angka($l->luas_tanam_ha, 1) }} Ha</span>
                 </span>
                 <span class="flex flex-col items-end gap-1"><x-status :s="$l->status()"/><x-verifikasi :s="$l->status_verifikasi"/></span>
             </a>

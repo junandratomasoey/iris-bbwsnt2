@@ -192,7 +192,7 @@
                     <th class="text-right" title="Jumlah hari berstatus kritis / siaga / waspada / aman / tanpa laporan">Hari K / S / W / A / –</th>
                     <th class="text-right">Kepatuhan</th>
                     <th class="text-right">Puncak kering (Ha)</th><th class="text-right">Puncak puso (Ha)</th>
-                    <th class="text-right">Debit rata-rata / min (L/dt)</th>
+                    <th class="text-right">Debit intake rata / min (L/dt)</th><th class="text-right">Debit sungai rata / min (m³/dt)</th>
                 </tr>
             </thead>
             <tbody>
@@ -205,6 +205,7 @@
                         <td class="text-right tabular-nums">{{ angka($d['puncak_kering_ha'], 1) }}</td>
                         <td class="text-right tabular-nums">{{ angka($d['puncak_puso_ha'], 1) }}</td>
                         <td class="whitespace-nowrap text-right tabular-nums">{{ $d['debit_rata_lps'] !== null ? angka($d['debit_rata_lps'], 1).' / '.angka($d['debit_min_lps'], 1) : '–' }}</td>
+                        <td class="whitespace-nowrap text-right tabular-nums">{{ $d['debit_sungai_rata_m3s'] !== null ? angka_r($d['debit_sungai_rata_m3s']).' / '.angka_r($d['debit_sungai_min_m3s']) : '–' }}</td>
                     </tr>
                 @endforeach
             </tbody>

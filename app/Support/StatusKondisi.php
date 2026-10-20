@@ -56,12 +56,8 @@ final class StatusKondisi
     /** Aturan yang sama dengan dariLaporan(), untuk baris hasil query mentah (rekap periode). */
     public static function dariNilai(?string $kondisi, float $tanam, float $kering, float $puso): string
     {
-        $status = match ($kondisi) {
-            'penuh', 'normal' => self::AMAN,
-            'kurang' => self::WASPADA,
-            'kering' => self::SIAGA,
-            default => self::KOSONG,
-        };
+        // laporan tanaman tanpa data saluran (form PPA terbaru) → dasar Aman, dinilai dari tanaman saja
+        $status = $kondisi === null || $kondisi === '' ? self::AMAN : self::dariSaluran($kondisi);
 
         $rasioKering = $tanam > 0 ? $kering / $tanam : 0;
 
@@ -75,6 +71,17 @@ final class StatusKondisi
         }
 
         return $status;
+    }
+
+    /** Status dari kondisi saluran (laporan air Manager). */
+    public static function dariSaluran(?string $kondisi): string
+    {
+        return match ($kondisi) {
+            'penuh', 'normal' => self::AMAN,
+            'kurang' => self::WASPADA,
+            'kering' => self::SIAGA,
+            default => self::KOSONG,
+        };
     }
 
     public static function maks(string $a, string $b): string

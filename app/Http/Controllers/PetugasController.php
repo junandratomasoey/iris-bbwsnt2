@@ -151,7 +151,9 @@ class PetugasController extends Controller
     /** Role yang boleh diberikan. Manager hanya oleh Admin OP / Super Admin. */
     private function roleBoleh(User $u): array
     {
-        return $u->boleh('kelola-pengguna') ? [Role::PETUGAS, Role::POB, Role::MANAGER] : [Role::PETUGAS, Role::POB];
+        // Manager (dan D.I./Sub-D.I.-nya) hanya diatur Super Admin, Pimpinan, Admin OP
+        return $u->boleh('kelola-pengguna') || ($u->isGlobal() && $u->boleh('kelola-petugas'))
+            ? [Role::PETUGAS, Role::POB, Role::MANAGER] : [Role::PETUGAS, Role::POB];
     }
 
     private function bolehUbah(User $u, User $target): bool
