@@ -18,9 +18,9 @@ final class Izin
 
     public const DAFTAR = [
         'lapor' => [
-            'grup' => 'form', 'label' => 'Isi laporan harian',
-            'ket' => 'Kondisi air, tanaman, dan foto per Sub-D.I. di wilayah tugasnya.',
-            'bawaan' => [Role::PETUGAS, Role::POB, Role::MANAGER, Role::ADMIN_OP],
+            'grup' => 'form', 'label' => 'Isi laporan harian (kondisi tanaman)',
+            'ket' => 'Tugas PPA: kondisi air & tanaman per petak tersier. Manager mengisi pembacaan pintu, bukan laporan ini.',
+            'bawaan' => [Role::PETUGAS, Role::POB, Role::ADMIN_OP],
         ],
         'isi-pintu' => [
             'grup' => 'form', 'label' => 'Isi pembacaan pintu air',

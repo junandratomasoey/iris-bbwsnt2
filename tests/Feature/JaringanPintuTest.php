@@ -146,8 +146,12 @@ class JaringanPintuTest extends TestCase
         $this->assertSame(2, LaporanHarian::where('sub_daerah_irigasi_id', $this->sub->id)->count());
         $this->assertSame($this->t1->id, LaporanHarian::first()->pintu_air_id);
 
-        // manager boleh melapor tingkat Sub-D.I. (tidak wajib petak)
-        $this->actingAs($this->manager)->post(route('laporan.store'), $this->laporan(['tanggal' => today()->subDay()->toDateString()]))->assertSessionHasNoErrors();
+        // kondisi tanaman adalah tugas PPA: Manager tidak bisa membuka/mengirim form laporan harian, tetapi tetap bisa melihat & memverifikasi
+        $this->actingAs($this->manager)->get(route('laporan.create'))->assertForbidden();
+        $this->actingAs($this->manager)->post(route('laporan.store'), $this->laporan(['tanggal' => today()->subDay()->toDateString()]))->assertForbidden();
+        $this->actingAs($this->manager)->get(route('laporan.index'))->assertOk()->assertDontSee('Isi laporan hari ini')->assertSee('Baca pintu air');
+        $this->actingAs($this->manager)->post(route('laporan.verifikasi', LaporanHarian::first()), ['keputusan' => 'disetujui'])->assertSessionHasNoErrors();
+        $this->assertSame('disetujui', LaporanHarian::first()->status_verifikasi);
     }
 
     public function test_laporan_per_petak_digabung_untuk_status_dan_rekap(): void
