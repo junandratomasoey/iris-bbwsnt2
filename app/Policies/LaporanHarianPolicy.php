@@ -20,7 +20,7 @@ class LaporanHarianPolicy
 
     public function update(User $user, LaporanHarian $l): bool
     {
-        if ($user->hasRole(...Role::PENGELOLA)) {
+        if ($user->boleh('kelola-laporan') && $user->bolehLihatSub($l->sub_daerah_irigasi_id)) {
             return true;
         }
 

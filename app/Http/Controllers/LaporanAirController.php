@@ -134,8 +134,11 @@ class LaporanAirController extends Controller
 
     private function bolehUbah(User $u, LaporanAir $l): bool
     {
-        if ($u->hasRole(...Role::PENGELOLA)) {
-            return true;
+        if ($u->boleh('kelola-laporan')) {
+            $ids = $u->diIdsTerjangkau();
+            if ($ids === null || in_array($l->daerah_irigasi_id, $ids, true)) {
+                return true;
+            }
         }
 
         return $l->user_id === $u->id && $u->boleh('lapor-air') && ! $l->terkunci();
@@ -156,7 +159,7 @@ class LaporanAirController extends Controller
     private function validasi(Request $request, User $u, ?LaporanAir $l = null): array
     {
         $diIds = $this->diBoleh($u)->pluck('id')->push($l?->daerah_irigasi_id)->filter()->unique()->values()->all();
-        $batasMundur = $u->hasRole(...Role::PENGELOLA) ? '2000-01-01' : today()->subDays(7)->toDateString();
+        $batasMundur = $u->boleh('kelola-laporan') ? '2000-01-01' : today()->subDays(7)->toDateString();
         $sisaFoto = LaporanAir::MAKS_FOTO - ($l?->foto()->count() ?? 0);
         $tgl = rescue(fn () => Carbon::parse($request->input('tanggal'))->toDateString(), (string) $request->input('tanggal'), false);
 

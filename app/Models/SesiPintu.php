@@ -58,6 +58,11 @@ class SesiPintu extends Model
         return $this->belongsTo(User::class);
     }
 
+    public function laporanHarian(): BelongsTo
+    {
+        return $this->belongsTo(LaporanHarian::class);
+    }
+
     public function pembacaan(): HasMany
     {
         return $this->hasMany(PembacaanPintu::class);

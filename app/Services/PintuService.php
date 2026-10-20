@@ -59,6 +59,11 @@ class PintuService
     public function bolehIsi(User $u, ?int $diId = null): Builder
     {
         $q = PintuAir::query()->when($diId, fn ($x) => $x->where('daerah_irigasi_id', $diId));
+        if ($u->boleh('kelola-laporan')) { // pengelola laporan boleh mengisi/mengoreksi semua pintu dalam jangkauannya
+            $diIds = $u->diIdsTerjangkau();
+
+            return $q->when($diIds !== null, fn ($x) => $x->whereIn('daerah_irigasi_id', $diIds));
+        }
         if (! $u->boleh('isi-pintu')) {
             return $q->whereRaw('1 = 0');
         }

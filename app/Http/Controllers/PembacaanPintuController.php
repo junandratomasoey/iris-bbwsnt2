@@ -188,7 +188,7 @@ class PembacaanPintuController extends Controller
         $bolehId = $this->svc->bolehIsi($u, $diId)->pluck('id')->all();
         $sisaFoto = SesiPintu::MAKS_FOTO - ($sesi?->foto()->count() ?? 0);
         $data = $request->validate([
-            'tanggal' => ['required', 'date', 'before_or_equal:today', 'after_or_equal:'.today()->subDays(30)->toDateString()],
+            'tanggal' => ['required', 'date', 'before_or_equal:today', 'after_or_equal:'.($u->boleh('kelola-laporan') ? '2000-01-01' : today()->subDays(30)->toDateString())],
             'jam' => ['nullable', 'date_format:H:i'],
             'jenis' => ['required', Rule::in(array_keys($sesi?->jenis === 'harian' ? SesiPintu::JENIS : SesiPintu::jenisPilihan()))],
             'catatan' => [Rule::requiredIf(fn () => $request->input('jenis') === 'lainnya'), 'nullable', 'string', 'max:2000'],
@@ -286,7 +286,10 @@ class PembacaanPintuController extends Controller
             return false; // diubah lewat laporan harian tanaman-nya
         }
 
-        return $u->bolehKelolaPintu($sesi->daerah_irigasi_id)
+        $diIds = $u->diIdsTerjangkau();
+        $pengelolaLaporan = $u->boleh('kelola-laporan') && ($diIds === null || in_array($sesi->daerah_irigasi_id, $diIds, true));
+
+        return $pengelolaLaporan || $u->bolehKelolaPintu($sesi->daerah_irigasi_id)
             || ($sesi->user_id === $u->id && $u->boleh('isi-pintu') && ! $sesi->terkunci());
     }
 }

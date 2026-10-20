@@ -95,7 +95,7 @@ class LaporanHarianController extends Controller
     {
         $this->authorize('update', $laporan);
         $laporan->load('foto');
-        $subs = $this->subPelaporan($request)->push($laporan->subDaerahIrigasi)->unique('id');
+        $subs = $this->subPelaporan($request, true)->push($laporan->subDaerahIrigasi)->unique('id');
         $sebelumnya = null;
         $petak = $this->petakPilihan($request->user(), $subs, $laporan);
         $laporan->load('sesiPintu.pembacaan');
@@ -110,7 +110,9 @@ class LaporanHarianController extends Controller
         $this->authorize('update', $laporan);
         $data = $this->validasi($request, $laporan);
         if ((int) $data['sub_daerah_irigasi_id'] !== $laporan->sub_daerah_irigasi_id) {
-            abort_unless($request->user()->bolehLapor((int) $data['sub_daerah_irigasi_id']), 403);
+            $u = $request->user();
+            abort_unless($u->bolehLapor((int) $data['sub_daerah_irigasi_id'])
+                || ($u->boleh('kelola-laporan') && $u->bolehLihatSub((int) $data['sub_daerah_irigasi_id'])), 403);
         }
         $data['mt'] = $this->mt($data);
         if ($laporan->status_verifikasi === 'perbaikan' && $laporan->user_id === $request->user()->id) {
@@ -229,9 +231,11 @@ class LaporanHarianController extends Controller
             ->when($request->boolean('milik_saya'), fn ($q) => $q->where('user_id', $user->id));
     }
 
-    private function subPelaporan(Request $request)
+    private function subPelaporan(Request $request, bool $ubah = false)
     {
-        $ids = $request->user()->subIdsPelaporan();
+        $u = $request->user();
+        // pengelola laporan boleh memindahkan laporan ke Sub-D.I. mana pun dalam jangkauannya
+        $ids = $ubah && $u->boleh('kelola-laporan') ? $u->subIdsTerjangkau() : $u->subIdsPelaporan();
 
         return SubDaerahIrigasi::with('daerahIrigasi:id,nama,lat,lng')
             ->when($ids !== null, fn ($q) => $q->whereIn('id', $ids))
@@ -240,7 +244,7 @@ class LaporanHarianController extends Controller
 
     private function validasi(Request $request, ?LaporanHarian $laporan = null): array
     {
-        $pengelola = $request->user()->hasRole(...Role::PENGELOLA);
+        $pengelola = $request->user()->boleh('kelola-laporan');
         $batasMundur = $pengelola ? '2000-01-01' : today()->subDays(7)->toDateString();
         $maksFoto = 5 - ($laporan?->foto()->count() ?? 0);
 
@@ -329,10 +333,11 @@ class LaporanHarianController extends Controller
      */
     private function pintuPilihan(\App\Models\User $u, $subs, array $tambahanId = []): array
     {
-        if (! $u->boleh('isi-pintu')) {
+        $kelola = $u->boleh('kelola-laporan');
+        if (! $kelola && ! $u->boleh('isi-pintu')) {
             return [];
         }
-        $daftar = app(\App\Services\PintuService::class)->bolehIsi($u)
+        $daftar = ($kelola ? PintuAir::query() : app(\App\Services\PintuService::class)->bolehIsi($u))
             ->whereIn('sub_daerah_irigasi_id', collect($subs)->pluck('id'))
             ->where(fn ($q) => $q->where('aktif', true)->orWhereIn('id', $tambahanId))
             ->with('petugas:id', 'pembacaanTerakhir')->urut()->get();
@@ -369,7 +374,8 @@ class LaporanHarianController extends Controller
             }
             $hasil[(int) $id] = ['debit' => $debit, 'tma' => $tma];
         }
-        if ($petakId && in_array($petakId, $boleh, true)) {
+        // wajib untuk laporan baru; laporan lama (sebelum ada isian pintu) boleh diubah tanpa mengisinya
+        if ($petakId && in_array($petakId, $boleh, true) && (! $laporan || $lama)) {
             $p = $hasil[$petakId] ?? ['debit' => null, 'tma' => null];
             $galat = [];
             if ($p['debit'] === null) {
@@ -419,7 +425,7 @@ class LaporanHarianController extends Controller
         $hasil = [];
         foreach ($subs as $sub) {
             $daftar = $semua->where('sub_daerah_irigasi_id', $sub->id);
-            $kelola = $u->hasRole(...Role::PENGELOLA) || $u->bolehKelolaPintu((int) $sub->daerah_irigasi_id);
+            $kelola = $u->boleh('kelola-laporan') || $u->bolehKelolaPintu((int) $sub->daerah_irigasi_id);
             $boleh = $kelola ? $daftar : $daftar->filter(fn ($p) => $p->petugas->isEmpty() || $p->petugas->contains('id', $u->id) || $p->id === $laporan?->pintu_air_id);
             $hasil[$sub->id] = [
                 'wajib' => $daftar->isNotEmpty() && $u->hasRole(Role::PETUGAS),

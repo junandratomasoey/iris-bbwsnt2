@@ -37,6 +37,11 @@ final class Izin
             'ket' => 'Membuat laporan kejadian baru.',
             'bawaan' => [Role::ADMIN_OP, Role::KOORDINATOR, Role::MANAGER, Role::PETUGAS, Role::POB],
         ],
+        'kelola-laporan' => [
+            'grup' => 'tindak', 'label' => 'Ubah & hapus semua laporan petugas',
+            'ket' => 'Laporan tanaman (termasuk debit/TMA pintu di dalamnya), laporan air, dan pembacaan pintu milik siapa pun, juga yang sudah disetujui atau lewat batas waktu.',
+            'bawaan' => [Role::ADMIN_OP],
+        ],
         'verifikasi' => [
             'grup' => 'tindak', 'label' => 'Verifikasi laporan harian',
             'ket' => 'Menyetujui atau meminta perbaikan laporan di wilayahnya.',

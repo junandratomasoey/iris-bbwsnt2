@@ -2,6 +2,9 @@
 <x-layouts.app title="Pembacaan pintu air">
 <x-judul judul="Pembacaan pintu air · {{ $sesi->tanggal->translatedFormat('l, d M Y') }}" sub="D.I. {{ $sesi->daerahIrigasi->nama }} · {{ $sesi->jenis_label }}{{ $sesi->jam ? ' · pukul '.substr($sesi->jam, 0, 5) : '' }}">
     <a href="{{ route('pintu.index', ['di' => $sesi->daerah_irigasi_id]) }}" class="btn-ghost"><x-ikon n="pintu" class="h-4 w-4"/> Pemantauan pintu</a>
+    @if($sesi->laporan_harian_id)
+        @can('update', $sesi->laporanHarian)<a href="{{ route('laporan.edit', $sesi->laporan_harian_id) }}" class="btn-ghost"><x-ikon n="edit" class="h-4 w-4"/> Ubah lewat laporan tanaman</a>@endcan
+    @endif
     @if($bolehUbah)
         <a href="{{ route('pembacaan-pintu.edit', $sesi) }}" class="btn-ghost"><x-ikon n="edit" class="h-4 w-4"/> Ubah</a>
         <form method="POST" action="{{ route('pembacaan-pintu.destroy', $sesi) }}" onsubmit="return confirm('Hapus pembacaan ini?')">@csrf @method('DELETE')<button class="btn-ghost text-status-kritis"><x-ikon n="hapus" class="h-4 w-4"/> Hapus</button></form>
