@@ -62,10 +62,10 @@ class PintuAirTest extends TestCase
         $this->actingAs($this->manager)->post(route('master.pintu-air.store'), [
             'daerah_irigasi_id' => $this->di->id,
             'pintu' => [
-                ['kode' => ' bos.1 ki ', 'jenis' => 'sadap', 'sub_daerah_irigasi_id' => $this->subA->id, 'debit_min_lps' => 80, 'debit_maks_lps' => 120],
-                ['kode' => 'BOS.2', 'jenis' => 'bagi', 'sub_daerah_irigasi_id' => $this->subB->id],
-                ['kode' => '', 'jenis' => 'sadap'],                    // baris kosong diabaikan
-                ['kode' => 'INTAKE', 'jenis' => 'intake', 'tma_min_cm' => 40],
+                ['kode' => ' bos.1 ki ', 'jenis' => 'sadap', 'tingkat' => 'tersier', 'sub_daerah_irigasi_id' => $this->subA->id, 'debit_min_lps' => 80, 'debit_maks_lps' => 120],
+                ['kode' => 'BOS.2', 'jenis' => 'bagi', 'tingkat' => 'sekunder', 'sub_daerah_irigasi_id' => $this->subB->id],
+                ['kode' => '', 'jenis' => 'sadap', 'tingkat' => 'tersier'],                    // baris kosong diabaikan
+                ['kode' => 'INTAKE', 'jenis' => 'intake', 'tingkat' => 'utama', 'tma_min_cm' => 40],
             ],
         ])->assertSessionHasNoErrors()->assertRedirect(route('pintu.index', ['di' => $this->di->id]));
         $this->assertSame(['bos.1 ki', 'BOS.2', 'INTAKE'], PintuAir::orderBy('urutan')->pluck('kode')->all());
@@ -74,9 +74,9 @@ class PintuAirTest extends TestCase
         $this->actingAs($this->manager)->post(route('master.pintu-air.store'), [
             'daerah_irigasi_id' => $this->di->id,
             'pintu' => [
-                ['kode' => 'BOS.2', 'jenis' => 'sadap'],
-                ['kode' => 'BOS.3', 'jenis' => 'sadap', 'debit_min_lps' => 100, 'debit_maks_lps' => 50],
-                ['kode' => 'BOS.4', 'jenis' => 'sadap', 'sub_daerah_irigasi_id' => $this->diLain->subDaerahIrigasi()->first()->id],
+                ['kode' => 'BOS.2', 'jenis' => 'sadap', 'tingkat' => 'tersier'],
+                ['kode' => 'BOS.3', 'jenis' => 'sadap', 'tingkat' => 'tersier', 'debit_min_lps' => 100, 'debit_maks_lps' => 50],
+                ['kode' => 'BOS.4', 'jenis' => 'sadap', 'tingkat' => 'tersier', 'sub_daerah_irigasi_id' => $this->diLain->subDaerahIrigasi()->first()->id],
             ],
         ])->assertSessionHasErrors(['pintu.0.kode', 'pintu.1.debit_maks_lps', 'pintu.2.sub_daerah_irigasi_id']);
 
@@ -173,7 +173,7 @@ class PintuAirTest extends TestCase
         $this->assertFalse($a->fresh()->aktif);
         $this->assertNull($kosong->fresh());
 
-        $this->actingAs($this->manager)->put(route('master.pintu-air.update', $a), ['kode' => 'BOS.1', 'jenis' => 'sadap', 'aktif' => 1, 'debit_min_lps' => 10])
+        $this->actingAs($this->manager)->put(route('master.pintu-air.update', $a), ['kode' => 'BOS.1', 'jenis' => 'sadap', 'tingkat' => 'tersier', 'aktif' => 1, 'debit_min_lps' => 10])
             ->assertRedirect(route('pintu.show', $a));
         $this->assertTrue($a->fresh()->aktif);
     }

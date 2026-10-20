@@ -141,6 +141,11 @@ class PetaController extends Controller
             $data = $this->detail->fotoHarian($ids, $sampai->startOfDay(), $internal);
         } else {
             $data = $this->detail->data($di, Periode::dariRequest($request), $internal, $subIds);
+            if ($internal) {
+                $data['pintu'] = app(\App\Services\PintuService::class)->peta($di->id, $subIds);
+                $data['pintu_url'] = route('pintu.index', ['di' => $di->id]);
+                $data['neraca_url'] = route('pintu.neraca', ['di' => $di->id]);
+            }
         }
 
         return response()->json($data)->header('Cache-Control', 'no-cache, private');

@@ -33,7 +33,7 @@ class LaporanHarian extends Model
     public const VERIFIKASI = ['menunggu' => 'Menunggu', 'disetujui' => 'Disetujui', 'perbaikan' => 'Perlu perbaikan'];
 
     protected $fillable = [
-        'tanggal', 'sub_daerah_irigasi_id', 'user_id', 'mt', 'debit_intake_lps', 'tma_cm', 'kondisi_saluran',
+        'tanggal', 'sub_daerah_irigasi_id', 'pintu_air_id', 'petak_kunci', 'user_id', 'mt', 'debit_intake_lps', 'tma_cm', 'kondisi_saluran',
         'bukaan_pintu_persen', 'fase_tanaman', 'luas_tanam_ha', 'luas_padi_ha', 'luas_palawija_ha', 'luas_horti_ha', 'jenis_palawija', 'jenis_horti', 'luas_hijau_ha', 'luas_kering_ha', 'luas_panen_ha',
         'luas_puso_ha', 'kendala', 'lat', 'lng', 'status_verifikasi', 'catatan_verifikasi', 'diverifikasi_oleh', 'diverifikasi_pada',
     ];
@@ -45,9 +45,20 @@ class LaporanHarian extends Model
         'lng' => 'float',
     ];
 
+    protected static function booted(): void
+    {
+        static::saving(fn (LaporanHarian $l) => $l->petak_kunci = (int) ($l->pintu_air_id ?? 0));
+    }
+
     public function subDaerahIrigasi(): BelongsTo
     {
         return $this->belongsTo(SubDaerahIrigasi::class);
+    }
+
+    /** Petak tersier (diwakili pintu tersiernya). */
+    public function petak(): BelongsTo
+    {
+        return $this->belongsTo(PintuAir::class, 'pintu_air_id');
     }
 
     public function user(): BelongsTo
@@ -67,7 +78,8 @@ class LaporanHarian extends Model
 
     public function status(): string
     {
-        return StatusKondisi::dariLaporan($this);
+        // laporan gabungan beberapa petak (KondisiService) membawa status petak terberat
+        return $this->getAttribute('status_gabungan') ?? StatusKondisi::dariLaporan($this);
     }
 
     /**

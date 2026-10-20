@@ -2,7 +2,10 @@
 <x-layouts.app title="Pintu air">
 <x-judul judul="Pintu air{{ $di ? ' · D.I. '.$di->nama : '' }}" sub="Debit & TMA tiap pintu dibanding rentang normalnya. Jadwal baca rutin: setiap Senin.">
     @can('isi-pintu')<a href="{{ route('pembacaan-pintu.create', $di ? ['di' => $di->id] : []) }}" class="btn-primary"><x-ikon n="tambah" class="h-4 w-4"/> Baca pintu air</a>@endcan
-    @if($kelola)<a href="{{ route('master.pintu-air.create', ['di' => $di->id]) }}" class="btn-ghost"><x-ikon n="pintu" class="h-4 w-4"/> Tambah pintu</a>@endif
+    @if($kelola)
+        <a href="{{ route('master.pintu-air.create', ['di' => $di->id]) }}" class="btn-ghost"><x-ikon n="pintu" class="h-4 w-4"/> Tambah pintu</a>
+        <a href="{{ route('master.pintu-air.penugasan', ['di' => $di->id]) }}" class="btn-ghost"><x-ikon n="petugas" class="h-4 w-4"/> Penugasan</a>
+    @endif
 </x-judul>
 
 <form method="GET" class="panel mb-4 flex flex-wrap items-end gap-3 p-3">
@@ -23,7 +26,10 @@
         </label>
     @endif
     <noscript><button class="btn-primary">Terapkan</button></noscript>
-    <a href="{{ route('pembacaan-pintu.index', $di ? ['di' => $di->id] : []) }}" class="ml-auto text-sm font-medium text-saluran-600">Riwayat pembacaan</a>
+    <span class="ml-auto flex gap-4 text-sm font-medium">
+        <a href="{{ route('pintu.neraca', $di ? ['di' => $di->id] : []) }}" class="text-saluran-600">Neraca & pemerataan</a>
+        <a href="{{ route('pembacaan-pintu.index', $di ? ['di' => $di->id] : []) }}" class="text-saluran-600">Riwayat pembacaan</a>
+    </span>
 </form>
 
 <div class="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -134,7 +140,8 @@
                             <tr>
                                 <td class="min-w-[11rem]">
                                     <a href="{{ route('pintu.show', $p) }}" class="font-semibold text-saluran-600">{{ $p->kode }}</a>
-                                    <span class="block text-xs text-basalt-soft">{{ $p->nama ?: $p->jenis_label }}@if($p->saluran) · {{ $p->saluran }}@endif</span>
+                                    <span class="block text-xs text-basalt-soft">{{ $p->tingkat_label }}{{ $p->hulu ? ' · dari '.$p->hulu->kode : '' }}{{ $p->nama ? ' · '.$p->nama : '' }}</span>
+                                    <span class="block text-[11px] text-basalt-mute">@if($p->petugas->isNotEmpty())<x-ikon n="petugas" class="inline h-3 w-3"/> {{ $p->petugas->pluck('name')->implode(', ') }}@else<span class="text-[#8A3510]">Belum ditugaskan</span>@endif · @if($p->lat)<x-ikon n="lokasi" class="inline h-3 w-3"/> titik ada@else<span class="text-[#8A3510]">titik belum</span>@endif</span>
                                 </td>
                                 <td class="whitespace-nowrap text-right">{{ $p->luas_layanan_ha ? angka_r($p->luas_layanan_ha).' Ha' : '–' }}</td>
                                 <td class="whitespace-nowrap">

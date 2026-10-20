@@ -74,11 +74,11 @@
 
     {{-- tab --}}
     <div class="sticky top-[45px] z-10 flex overflow-x-auto border-b border-savana-line bg-white px-1" role="tablist">
-        @foreach(['foto' => 'Foto', 'sub' => 'Sub-D.I.', 'infra' => 'Infrastruktur', 'kejadian' => 'Kejadian'] as $k => $l)
+        @foreach(['foto' => 'Foto', 'sub' => 'Sub-D.I.'] + ($internal ? ['pintu' => 'Pintu'] : []) + ['infra' => 'Infrastruktur', 'kejadian' => 'Kejadian'] as $k => $l)
             <button type="button" role="tab" :aria-selected="detailTab === '{{ $k }}'" @click="detailTab = '{{ $k }}'"
                     :class="detailTab === '{{ $k }}' ? 'border-saluran-600 text-saluran-700' : 'border-transparent text-basalt-soft'"
                     class="-mb-px flex-1 shrink-0 whitespace-nowrap border-b-2 px-1.5 py-2 text-[13px] font-semibold">{{ $l }}
-                <span class="ml-0.5 rounded-full bg-savana-deep px-1 text-[11px]" x-text="{ foto: jumlahFoto, sub: detail.sub.length, infra: detail.bangunan.length, kejadian: detail.kejadian.length }['{{ $k }}']"></span></button>
+                <span class="ml-0.5 rounded-full bg-savana-deep px-1 text-[11px]" x-text="{ foto: jumlahFoto, sub: detail.sub.length, pintu: (detail.pintu || []).length, infra: detail.bangunan.length, kejadian: detail.kejadian.length }['{{ $k }}']"></span></button>
         @endforeach
     </div>
 
@@ -135,7 +135,20 @@
                             <p x-text="`${s.laporan.tanggal} · saluran ${String(s.laporan.kondisi).toLowerCase()}${s.laporan.fase ? ' · ' + s.laporan.fase : ''}`"></p>
                             <p x-show="s.laporan.komoditas" x-text="s.laporan.komoditas"></p>
                             <p>Tanam <b class="text-basalt" x-text="fmt(s.laporan.tanam, 1)"></b> · kering <b class="text-basalt" x-text="fmt(s.laporan.kering, 1)"></b> · puso <b class="text-basalt" x-text="fmt(s.laporan.puso, 1)"></b> Ha</p>
-                            @if($internal)<p>Debit <b class="text-basalt" x-text="fmt(s.laporan.debit, 1)"></b> L/dt · TMA <b class="text-basalt" x-text="fmt(s.laporan.tma, 1)"></b> cm · <a :href="s.laporan.url" class="font-semibold text-saluran-600">Laporan</a></p>@endif
+                            @if($internal)<p x-show="!(s.laporan.petak || []).length">Debit <b class="text-basalt" x-text="fmt(s.laporan.debit, 1)"></b> L/dt · TMA <b class="text-basalt" x-text="fmt(s.laporan.tma, 1)"></b> cm · <a :href="s.laporan.url" class="font-semibold text-saluran-600">Laporan</a></p>@endif
+                            <template x-if="(s.laporan.petak || []).length">
+                                <ul class="mt-1.5 space-y-1 border-l-2 border-savana-line pl-2">
+                                    <template x-for="pt in s.laporan.petak" :key="pt.kode">
+                                        <li class="flex items-baseline justify-between gap-2">
+                                            <span><span class="mr-1 inline-block h-2 w-2 rounded-full" :style="`background:${pt.warna}`"></span><b class="text-basalt" x-text="'Petak ' + pt.kode"></b>
+                                                <span x-text="` · ${pt.tanggal} · kering ${fmt(pt.kering, 1)}/${fmt(pt.tanam, 1)} Ha` + (pt.puso ? ` · puso ${fmt(pt.puso, 1)}` : '')"></span>
+                                                @if($internal)<span x-text="` · ${fmt(pt.debit, 1)} L/dt`"></span> <a :href="pt.url" class="font-semibold text-saluran-600">Laporan</a>@endif
+                                            </span>
+                                            <span class="shrink-0 font-semibold" :style="`color:${pt.warna}`" x-text="pt.status_label"></span>
+                                        </li>
+                                    </template>
+                                </ul>
+                            </template>
                         </div>
                     </template>
                     <p x-show="!s.laporan" class="mt-1 text-basalt-mute">Belum ada laporan 3 hari terakhir.</p>
@@ -198,6 +211,31 @@
         </ul>
         <div x-show="!detail.bangunan.length" class="px-4 py-8 text-center text-sm text-basalt-soft">Belum ada data infrastruktur.</div>
     </section>
+
+    @if($internal)
+    {{-- PINTU AIR (internal) --}}
+    <section x-show="detailTab === 'pintu'" x-cloak>
+        <div class="flex flex-wrap gap-x-4 gap-y-1 border-b border-savana-line px-4 py-2 text-xs font-semibold">
+            <a :href="detail.pintu_url" class="text-saluran-600">Pemantauan pintu</a>
+            <a :href="detail.neraca_url" class="text-saluran-600">Neraca & pemerataan</a>
+        </div>
+        <ul class="divide-y divide-savana-line">
+            <template x-for="p in detail.pintu || []" :key="p.id">
+                <li>
+                    <button type="button" @click="fokusPintu(p)" class="flex w-full items-center gap-3 px-4 py-2 text-left text-xs hover:bg-savana">
+                        <span class="h-3 w-3 shrink-0 rounded-full border-2 border-white shadow" :style="`background:${warnaPintu(p)}`"></span>
+                        <span class="min-w-0 flex-1">
+                            <span class="block text-sm font-semibold" x-text="'Pintu ' + p.kode"></span>
+                            <span class="block text-basalt-mute" x-text="p.tingkat_label + (p.tanggal ? ` · ${fmt(p.debit, 1)} L/dt · ${fmt(p.tma, 1)} cm · ${p.tanggal}` : ' · belum dibaca')"></span>
+                        </span>
+                    </button>
+                </li>
+            </template>
+            <li x-show="!(detail.pintu || []).length" class="px-4 py-8 text-center text-sm text-basalt-soft">Belum ada pintu air bertitik koordinat. Titik diambil petugas dengan GPS saat membaca pintu.</li>
+        </ul>
+        <p class="border-t border-savana-line px-4 py-2 text-[11px] text-basalt-mute">Warna titik: <span class="text-[#D9622B]">●</span> kurang/rendah · <span class="text-[#4E8A2E]">●</span> normal · <span class="text-[#3D7DB3]">●</span> berlebih/tinggi · <span class="text-[#6B7A80]">●</span> belum dinilai. Garis = aliran dari pintu hulu.</p>
+    </section>
+    @endif
 
     {{-- KEJADIAN --}}
     <ul x-show="detailTab === 'kejadian'" x-cloak class="divide-y divide-savana-line">

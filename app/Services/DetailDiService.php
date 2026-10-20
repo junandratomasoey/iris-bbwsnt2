@@ -147,7 +147,7 @@ class DetailDiService
                 $hari[$t]['foto'] += $l->foto_count;
             }
         }
-        foreach ($laporan->groupBy('sub_daerah_irigasi_id') as $baris) {
+        foreach ($laporan->groupBy(fn ($l) => $l->sub_daerah_irigasi_id.':'.$l->petak_kunci) as $baris) { // per Sub-D.I. / petak tersier
             $baris = $baris->values();
             $k = -1;
             foreach (array_keys($hari) as $t) {
@@ -203,6 +203,11 @@ class DetailDiService
                 'fase' => LaporanHarian::FASE[$l->fase_tanaman] ?? null,
                 'komoditas' => $l->ringkasKomoditas(),
                 'tanam' => (float) $l->luas_tanam_ha, 'kering' => (float) $l->luas_kering_ha, 'puso' => (float) $l->luas_puso_ha,
+                'petak' => collect($l->getAttribute('petak_rinci') ?? [])->map(fn ($r) => [
+                    'kode' => $r['kode'], 'nama' => $r['nama'], 'status' => $r['status'], 'status_label' => StatusKondisi::label($r['status']), 'warna' => StatusKondisi::WARNA[$r['status']],
+                    'tanam' => $r['tanam'], 'kering' => $r['kering'], 'puso' => $r['puso'],
+                    'tanggal' => \Carbon\Carbon::parse($r['tanggal'])->translatedFormat('d M'),
+                ] + ($internal ? ['debit' => $r['debit'], 'url' => route('laporan.show', $r['laporan_id'])] : []))->values(),
             ] + ($internal ? ['debit' => (float) $l->debit_intake_lps, 'tma' => (float) $l->tma_cm, 'url' => route('laporan.show', $l)] : []) : null,
         ] + ($internal ? [
             'petugas' => $s->petugas->map(fn ($p) => ['nama' => $p->name, 'jabatan' => $p->jabatan, 'wa' => $p->waLink()])->values(),

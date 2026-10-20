@@ -27,7 +27,7 @@ class RekapService
 
     public function rekap(Periode $p, ?array $subIds = null): array
     {
-        $kunci = 'rekap:v4:'.md5(json_encode($subIds)).':'.$p->dari->toDateString().':'.$p->sampai->toDateString();
+        $kunci = 'rekap:v5:'.md5(json_encode($subIds)).':'.$p->dari->toDateString().':'.$p->sampai->toDateString();
         $ttl = $p->sampai->isToday() ? 300 : 3600;
 
         return Cache::remember($kunci, $ttl, fn () => $this->hitung($p, $subIds));
@@ -68,7 +68,8 @@ class RekapService
         }
         $statSub = [];
 
-        $proses = function (int $subId, array $baris) use (&$diHari, &$statSub, $hari, $n, $subs, $p) {
+        $subHari = []; // [sub][tanggal] = true — untuk kepatuhan (Sub-D.I. yang melapor per hari, berapa pun petaknya)
+        $proses = function (int $subId, array $baris, int $petak = 0) use (&$diHari, &$statSub, &$subHari, $hari, $n, $subs, $p) {
             $diId = $subs[$subId] ?? null;
             if (! $diId || ! isset($diHari[$diId])) {
                 return;
@@ -80,6 +81,7 @@ class RekapService
                     continue; // laporan sebelum periode hanya dipakai untuk status hari pertama
                 }
                 $st['laporan']++;
+                $subHari[$subId][$b['tanggal']] = true;
                 $st['tanam'] = max($st['tanam'], $b['tanam']);
                 foreach (['padi', 'palawija', 'horti'] as $k) {
                     $st[$k] = max($st[$k], $b[$k]);
@@ -91,7 +93,7 @@ class RekapService
                 $st['debit_n']++;
                 $st['debit_min'] = $st['debit_min'] === null ? $b['debit'] : min($st['debit_min'], $b['debit']);
             }
-            $statSub[$subId] = $st;
+            $statSub[] = $st + ['sub' => $subId, 'petak' => $petak]; // satu baris per unit laporan (Sub-D.I. atau petak tersier)
 
             // status tiap hari: laporan terakhir yang berumur ≤ MASA_BERLAKU_HARI
             $k = -1;
@@ -111,20 +113,26 @@ class RekapService
         };
 
         $cursor = LaporanHarian::query()->toBase()
-            ->select(['sub_daerah_irigasi_id', 'tanggal', 'kondisi_saluran', 'luas_tanam_ha', 'luas_padi_ha', 'luas_palawija_ha', 'luas_horti_ha', 'luas_kering_ha', 'luas_puso_ha', 'luas_panen_ha', 'debit_intake_lps'])
+            ->select(['sub_daerah_irigasi_id', 'petak_kunci', 'tanggal', 'kondisi_saluran', 'luas_tanam_ha', 'luas_padi_ha', 'luas_palawija_ha', 'luas_horti_ha', 'luas_kering_ha', 'luas_puso_ha', 'luas_panen_ha', 'debit_intake_lps'])
             ->whereBetween('tanggal', [$p->dari->copy()->subDays(SK::MASA_BERLAKU_HARI - 1)->toDateString(), $p->sampai->toDateString()])
             ->where('status_verifikasi', '!=', 'perbaikan')
             ->when($subIds !== null, fn ($q) => $q->whereIn('sub_daerah_irigasi_id', $subIds))
-            ->orderBy('sub_daerah_irigasi_id')->orderBy('tanggal')->cursor();
+            ->orderBy('sub_daerah_irigasi_id')->orderBy('petak_kunci')->orderBy('tanggal')->cursor();
 
+        // tiap unit (Sub-D.I. atau petak tersier) diproses sendiri; status D.I. = unit terberat, luas puncak dijumlah antar-unit
         $subKini = null;
+        $petakKini = 0;
+        $unitKini = null;
         $baris = [];
         foreach ($cursor as $r) {
-            if ($r->sub_daerah_irigasi_id !== $subKini) {
+            $unit = $r->sub_daerah_irigasi_id.':'.$r->petak_kunci;
+            if ($unit !== $unitKini) {
                 if ($subKini !== null) {
-                    $proses($subKini, $baris);
+                    $proses($subKini, $baris, $petakKini);
                 }
-                $subKini = $r->sub_daerah_irigasi_id;
+                $subKini = (int) $r->sub_daerah_irigasi_id;
+                $petakKini = (int) $r->petak_kunci;
+                $unitKini = $unit;
                 $baris = [];
             }
             $tanam = (float) $r->luas_tanam_ha;
@@ -139,7 +147,7 @@ class RekapService
             ];
         }
         if ($subKini !== null) {
-            $proses($subKini, $baris);
+            $proses($subKini, $baris, $petakKini);
         }
 
         // ---------- per D.I. ----------
@@ -158,11 +166,15 @@ class RekapService
                     [$tersering, $maks] = [$s, $hitung[$s]];
                 }
             }
-            $ids = $subs->filter(fn ($v) => $v === $d->id)->keys();
-            $st = collect($ids)->map(fn ($id) => $statSub[$id] ?? null)->filter();
+            $ids = $subs->filter(fn ($v) => $v === $d->id)->keys()->all();
+            $st = collect($statSub)->whereIn('sub', $ids);
+            // Sub-D.I. yang sudah dilaporkan per petak: luas dari laporan tingkat Sub-D.I. lama tidak ikut dijumlah (hindari dobel)
+            $berpetak = $st->where('petak', '>', 0)->pluck('sub')->unique()->all();
+            $st = $st->reject(fn ($x) => $x['petak'] === 0 && in_array($x['sub'], $berpetak, true));
             $debitN = $st->sum('debit_n');
             $jumlahSub = $subPerDi[$d->id] ?? 0;
             $laporan = (int) $st->sum('laporan');
+            $hariLapor = collect($ids)->sum(fn ($id) => count($subHari[$id] ?? []));
 
             $di[$d->id] = [
                 'id' => $d->id, 'kode' => $d->kode, 'nama' => $d->nama,
@@ -172,7 +184,7 @@ class RekapService
                 'hari_berisiko' => $hitung[SK::SIAGA] + $hitung[SK::KRITIS],
                 'terberat' => $terberat, 'tersering' => $tersering,
                 'jumlah_sub' => $jumlahSub, 'laporan' => $laporan,
-                'kepatuhan' => $jumlahSub ? (int) round($laporan / ($jumlahSub * $n) * 100) : 0,
+                'kepatuhan' => $jumlahSub ? (int) round($hariLapor / ($jumlahSub * $n) * 100) : 0,
                 'puncak_tanam_ha' => round($st->sum('tanam'), 2),
                 'puncak_padi_ha' => round($st->sum('padi'), 2), 'puncak_palawija_ha' => round($st->sum('palawija'), 2), 'puncak_horti_ha' => round($st->sum('horti'), 2),
                 'puncak_kering_ha' => round($st->sum('kering'), 2),
@@ -207,7 +219,7 @@ class RekapService
         }
 
         // ---------- kepatuhan per Satgas ----------
-        $kepatuhan = $this->kepatuhan($diList, $subs, $statSub, $n);
+        $kepatuhan = $this->kepatuhan($diList, $subs, $subHari, $n);
 
         // ---------- kejadian baru dalam periode ----------
         $kejadian = Kejadian::whereBetween('tanggal_lapor', [$p->dari->toDateString(), $p->sampai->toDateString()])
@@ -277,14 +289,15 @@ class RekapService
         }, $kolom);
     }
 
-    private function kepatuhan($diList, $subs, array $statSub, int $n): array
+    /** @param array $subHari [sub][tanggal] = true */
+    private function kepatuhan($diList, $subs, array $subHari, int $n): array
     {
         $satgasDi = $diList->mapWithKeys(fn ($d) => [$d->id => $d->kabupaten?->wilayah_satgas_id]);
         $baris = WilayahSatgas::orderBy('id')->get()->map(fn ($w) => ['id' => $w->id, 'kode' => $w->kode, 'cakupan' => $w->cakupan])->push(['id' => null, 'kode' => null, 'cakupan' => null]);
 
-        return $baris->map(function ($w) use ($satgasDi, $subs, $statSub, $n) {
+        return $baris->map(function ($w) use ($satgasDi, $subs, $subHari, $n) {
             $ids = $subs->filter(fn ($diId) => ($satgasDi[$diId] ?? null) === $w['id'])->keys();
-            $laporan = $ids->sum(fn ($id) => $statSub[$id]['laporan'] ?? 0);
+            $laporan = $ids->sum(fn ($id) => count($subHari[$id] ?? []));
             $kab = Kabupaten::where('wilayah_satgas_id', $w['id'])->whereHas('daerahIrigasi')->orderBy('nama')->pluck('nama')->implode(', ');
 
             return $w + ['kabupaten' => $kab, 'jumlah_sub' => $ids->count(), 'laporan' => (int) $laporan,

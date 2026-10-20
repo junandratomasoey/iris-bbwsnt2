@@ -1,5 +1,5 @@
 // Form pembacaan pintu air: status langsung terhadap rentang normal tiap pintu.
-export function formPintu({ batas, nilai, rutin, tanggal, jenis }) {
+export function formPintu({ batas, nilai, rutin, tanggal, jenis, saja }) {
     const angka = (v) => (v === null || v === undefined || v === '' ? null : Number(v));
     const banding = (v, min, maks, bawah, atas) => {
         v = angka(v);
@@ -19,6 +19,36 @@ export function formPintu({ batas, nilai, rutin, tanggal, jenis }) {
         tanggal,
         jenis: jenis ?? '',
         kirim: false,
+        saja: !!saja,
+        titik: {},
+        gagal: {},
+        gps: null,
+        jumlahTitik() {
+            return Object.keys(this.titik).length;
+        },
+        ambilTitik(id) {
+            this.gagal[id] = '';
+            if (!navigator.geolocation) {
+                this.gagal[id] = 'Perangkat ini tidak mendukung GPS.';
+                return;
+            }
+            this.gps = id;
+            navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                    this.gps = null;
+                    this.titik[id] = {
+                        lat: pos.coords.latitude.toFixed(7),
+                        lng: pos.coords.longitude.toFixed(7),
+                        akurasi: Math.round(pos.coords.accuracy),
+                    };
+                },
+                (err) => {
+                    this.gps = null;
+                    this.gagal[id] = err.code === 1 ? 'Izin lokasi ditolak. Aktifkan izin lokasi untuk situs ini.' : 'GPS belum mendapat sinyal. Coba lagi di tempat terbuka.';
+                },
+                { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 },
+            );
+        },
         hariSenin() {
             if (!this.tanggal) return true;
             const [y, m, d] = this.tanggal.split('-').map(Number);

@@ -46,6 +46,9 @@ final class StatusKondisi
         if (! $l) {
             return self::KOSONG;
         }
+        if ($l->getAttribute('status_gabungan')) {
+            return $l->getAttribute('status_gabungan');
+        }
 
         return self::dariNilai($l->kondisi_saluran, (float) $l->luas_tanam_ha, (float) $l->luas_kering_ha, (float) $l->luas_puso_ha);
     }

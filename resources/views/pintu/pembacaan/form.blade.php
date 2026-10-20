@@ -18,7 +18,7 @@
     ]]);
 @endphp
 <form method="POST" action="{{ $ubah ? route('pembacaan-pintu.update', $sesi) : route('pembacaan-pintu.store') }}" enctype="multipart/form-data"
-      x-data="formPintu({ batas: @js($dataPintu), nilai: @js($nilai), rutin: {{ SesiPintu::HARI_RUTIN }}, tanggal: @js(old('tanggal', $sesi->tanggal?->toDateString())), jenis: @js(old('jenis', $sesi->jenis)) })" @submit="kirim = true">
+      x-data="formPintu({ batas: @js($dataPintu), nilai: @js($nilai), saja: {{ $adaTugas ? 'true' : 'false' }}, rutin: {{ SesiPintu::HARI_RUTIN }}, tanggal: @js(old('tanggal', $sesi->tanggal?->toDateString())), jenis: @js(old('jenis', $sesi->jenis)) })" @submit="kirim = true">
     @csrf @if($ubah) @method('PUT') @endif
     <input type="hidden" name="daerah_irigasi_id" value="{{ $di->id }}">
 
@@ -49,18 +49,46 @@
     @if($pintu->isEmpty())
         <div class="panel"><x-kosong judul="Tidak ada pintu yang bisa Anda isi di D.I. ini"/></div>
     @endif
+    @if($adaTugas)
+        <div class="mb-3 flex flex-wrap items-center gap-2 text-sm" role="group" aria-label="Pintu yang ditampilkan">
+            <button type="button" @click="saja = true" :class="saja ? 'bg-saluran-600 text-white' : 'bg-white'" class="rounded-full border border-savana-line px-3 py-1.5 font-medium">Pintu saya ({{ $pintu->where('tugas_saya', true)->count() }})</button>
+            <button type="button" @click="saja = false" :class="!saja ? 'bg-saluran-600 text-white' : 'bg-white'" class="rounded-full border border-savana-line px-3 py-1.5 font-medium">Semua yang bisa saya isi ({{ $pintu->count() }})</button>
+        </div>
+    @endif
     @foreach($pintu->groupBy(fn ($p) => $p->sub_daerah_irigasi_id ?? 0) as $subId => $grup)
-        <section class="panel mb-4 overflow-hidden">
+        <section class="panel mb-4 overflow-hidden" @if($adaTugas && $grup->where('tugas_saya', true)->isEmpty()) x-show="!saja" @endif>
             <h2 class="border-b border-savana-line bg-savana px-3 py-2 text-sm font-semibold">{{ $subId ? 'Sub-D.I. '.$grup->first()->subDaerahIrigasi->nama : 'Tingkat D.I.' }}</h2>
             <ul class="divide-y divide-savana-line">
                 @foreach($grup as $p)
                     @php $t = $p->pembacaanTerakhir; @endphp
-                    <li class="grid grid-cols-2 gap-x-3 gap-y-2 p-3 lg:grid-cols-12 lg:gap-3" :class="terisi({{ $p->id }}) && 'bg-[#F4F8F1]'">
+                    <li class="grid grid-cols-2 gap-x-3 gap-y-2 p-3 lg:grid-cols-12 lg:gap-3" :class="terisi({{ $p->id }}) && 'bg-[#F4F8F1]'" @if($adaTugas && ! $p->tugas_saya) x-show="!saja" @endif>
                         <div class="col-span-2 lg:col-span-3">
-                            <p class="font-semibold">{{ $p->kode }} @unless($p->aktif)<span class="chip-kosong">nonaktif</span>@endunless</p>
-                            <p class="text-xs text-basalt-soft">{{ $p->nama ?: $p->jenis_label }}</p>
+                            <p class="font-semibold">{{ $p->kode }} @if($p->tugas_saya)<span class="chip-aman">tugas saya</span>@endif @unless($p->aktif)<span class="chip-kosong">nonaktif</span>@endunless</p>
+                            <p class="text-xs text-basalt-soft">{{ $p->tingkat_label }}{{ $p->nama ? ' · '.$p->nama : '' }}</p>
                             <p class="mt-1 text-[11px] text-basalt-mute">@if($p->punyaRentangDebit() || $p->tma_min_cm !== null || $p->tma_maks_cm !== null)Normal: {{ PintuAir::rentangTeks($p->debit_min_lps, $p->debit_maks_lps, 'L/dt') }} · {{ PintuAir::rentangTeks($p->tma_min_cm, $p->tma_maks_cm, 'cm') }}@else Rentang normal belum diisi @endif</p>
                             @if($t && (! $ubah || $t->sesi_pintu_id !== $sesi->id))<p class="text-[11px] text-basalt-mute">Terakhir {{ $t->tanggal->translatedFormat('d M') }}: {{ angka_r($t->debit_lps) }} L/dt · {{ angka_r($t->tma_cm) }} cm</p>@endif
+                            @if($p->boleh_titik)
+                                <div class="mt-1.5 text-xs">
+                                    <input type="hidden" name="baca[{{ $p->id }}][lat]" :value="titik[{{ $p->id }}]?.lat ?? ''">
+                                    <input type="hidden" name="baca[{{ $p->id }}][lng]" :value="titik[{{ $p->id }}]?.lng ?? ''">
+                                    <input type="hidden" name="baca[{{ $p->id }}][akurasi]" :value="titik[{{ $p->id }}]?.akurasi ?? ''">
+                                    <template x-if="!titik[{{ $p->id }}]">
+                                        <button type="button" @click="ambilTitik({{ $p->id }})" :disabled="gps === {{ $p->id }}"
+                                                class="inline-flex items-center gap-1 rounded-md border px-2 py-1 font-medium {{ $p->lat ? 'border-savana-line text-saluran-600' : 'border-[#D9622B] bg-[#FBE3D6] text-[#8A3510]' }}">
+                                            <x-ikon n="lokasi" class="h-3.5 w-3.5"/> <span x-text="gps === {{ $p->id }} ? 'Mencari GPS…' : '{{ $p->lat ? 'Perbarui titik pintu' : 'Titik belum ada — ambil GPS di pintu' }}'"></span>
+                                        </button>
+                                    </template>
+                                    <template x-if="titik[{{ $p->id }}]">
+                                        <span class="inline-flex flex-wrap items-center gap-1">
+                                            <span class="font-semibold text-[#2F5A19]">Titik direkam</span>
+                                            <span :class="titik[{{ $p->id }}].akurasi > 30 && 'font-semibold text-[#8A3510]'" x-text="'±' + titik[{{ $p->id }}].akurasi + ' m' + (titik[{{ $p->id }}].akurasi > 30 ? ' — kurang akurat, coba lagi di tempat terbuka' : '')"></span>
+                                            <button type="button" class="text-saluran-600 underline" @click="ambilTitik({{ $p->id }})">ulang</button>
+                                            <button type="button" class="text-basalt-soft underline" @click="delete titik[{{ $p->id }}]">batal</button>
+                                        </span>
+                                    </template>
+                                    <p x-show="gagal[{{ $p->id }}]" x-text="gagal[{{ $p->id }}]" class="mt-1 text-[#8A3510]"></p>
+                                </div>
+                            @endif
                         </div>
                         <label class="lg:col-span-2"><span class="label">Debit (L/dt)</span>
                             <input type="number" step="any" min="0" inputmode="decimal" name="baca[{{ $p->id }}][debit]" x-model="nilai[{{ $p->id }}].debit" class="input">
@@ -87,9 +115,9 @@
     </section>
 
     <div class="sticky bottom-0 flex flex-wrap items-center gap-3 border-t border-savana-line bg-savana py-3">
-        <button class="btn-primary px-8" :disabled="kirim || jumlah() === 0" x-text="kirim ? 'Menyimpan…' : `Simpan ${jumlah()} pintu`"></button>
+        <button class="btn-primary px-8" :disabled="kirim || (jumlah() === 0 && jumlahTitik() === 0)" x-text="kirim ? 'Menyimpan…' : (jumlah() ? `Simpan ${jumlah()} pintu` : `Simpan ${jumlahTitik()} titik`)"></button>
         <a href="{{ $ubah ? route('pembacaan-pintu.show', $sesi) : route('pintu.index', ['di' => $di->id]) }}" class="btn-ghost">Batal</a>
-        <span class="text-sm text-basalt-soft" x-show="jumlah() === 0">Isi debit atau TMA minimal satu pintu.</span>
+        <span class="text-sm text-basalt-soft" x-show="jumlah() === 0 && jumlahTitik() === 0">Isi debit atau TMA minimal satu pintu.</span>
     </div>
 </form>
 @endif

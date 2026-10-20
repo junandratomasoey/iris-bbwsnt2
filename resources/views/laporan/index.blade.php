@@ -59,7 +59,7 @@
                     <tr class="hover:bg-savana" :class="pilih.includes({{ $l->id }}) && 'bg-saluran-50'">
                         @if($idSiap->isNotEmpty())<td>@if($bolehSetujui($l))<input type="checkbox" value="{{ $l->id }}" x-model.number="pilih" class="rounded border-savana-line text-saluran-600" aria-label="Pilih laporan {{ $l->subDaerahIrigasi->nama }} {{ $l->tanggal->format('d/m') }}">@endif</td>@endif
                         <td class="whitespace-nowrap"><a href="{{ route('laporan.show', $l) }}" class="font-semibold text-saluran-700 hover:underline">{{ $l->tanggal->translatedFormat('d M Y') }}</a></td>
-                        <td>{{ $l->subDaerahIrigasi->nama }}<div class="text-xs text-basalt-soft">D.I. {{ $l->subDaerahIrigasi->daerahIrigasi->nama }}</div></td>
+                        <td>{{ $l->subDaerahIrigasi->nama }}@if($l->petak)<span class="ml-1 rounded bg-savana-deep px-1.5 text-xs font-semibold">Petak {{ $l->petak->kode }}</span>@endif<div class="text-xs text-basalt-soft">D.I. {{ $l->subDaerahIrigasi->daerahIrigasi->nama }}</div></td>
                         <td class="text-right tabular-nums">{{ angka($l->debit_intake_lps, 1) }}</td>
                         <td class="text-right tabular-nums">{{ angka($l->tma_cm, 1) }}</td>
                         <td>{{ App\Models\LaporanHarian::KONDISI[$l->kondisi_saluran] ?? $l->kondisi_saluran }}</td>
@@ -81,7 +81,7 @@
                     @if($bolehSetujui($l))<label class="py-3.5 pl-4"><input type="checkbox" value="{{ $l->id }}" x-model.number="pilih" class="rounded border-savana-line text-saluran-600" aria-label="Pilih laporan"></label>@endif
                     <a href="{{ route('laporan.show', $l) }}" class="block min-w-0 flex-1 px-4 py-3">
                     <div class="flex items-start justify-between gap-2">
-                        <div><p class="font-semibold">{{ $l->subDaerahIrigasi->nama }}</p><p class="text-xs text-basalt-soft">{{ $l->tanggal->translatedFormat('d M Y') }} · {{ $l->user->name }}</p></div>
+                        <div><p class="font-semibold">{{ $l->subDaerahIrigasi->nama }}@if($l->petak) · Petak {{ $l->petak->kode }}@endif</p><p class="text-xs text-basalt-soft">{{ $l->tanggal->translatedFormat('d M Y') }} · {{ $l->user->name }}</p></div>
                         <x-status :s="$l->status()"/>
                     </div>
                     <p class="mt-1 text-xs text-basalt-soft">Debit {{ angka($l->debit_intake_lps, 1) }} L/dt · TMA {{ angka($l->tma_cm, 1) }} cm · kering {{ angka($l->luas_kering_ha, 1) }} Ha</p>

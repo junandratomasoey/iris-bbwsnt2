@@ -144,6 +144,12 @@ class User extends Authenticatable
         });
     }
 
+    /** Pintu air yang ditugaskan kepada user ini (penanggung jawab / pengganti). */
+    public function pintuTugas(): BelongsToMany
+    {
+        return $this->belongsToMany(PintuAir::class, 'pintu_air_user')->withPivot('peran')->withTimestamps();
+    }
+
     /** ID D.I. dalam jangkauan user. null = semua. */
     public function diIdsTerjangkau(): ?array
     {

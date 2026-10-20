@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\DaerahIrigasi;
 use App\Models\Foto;
 use App\Models\LaporanHarian;
+use App\Models\PintuAir;
 use App\Models\SubDaerahIrigasi;
 use App\Services\FotoService;
 use App\Support\Role;
@@ -22,7 +23,7 @@ class LaporanHarianController extends Controller
     {
         $user = $request->user();
         $laporan = $this->query($request)
-            ->with(['subDaerahIrigasi.daerahIrigasi:id,nama', 'user:id,name,no_hp', 'foto'])
+            ->with(['subDaerahIrigasi.daerahIrigasi:id,nama', 'user:id,name,no_hp', 'foto', 'petak:id,kode,nama'])
             ->withCount('foto')
             ->latest('tanggal')->latest('id')
             ->paginate(25)->withQueryString();
@@ -55,7 +56,10 @@ class LaporanHarianController extends Controller
                 'luas_padi_ha', 'luas_palawija_ha', 'luas_horti_ha', 'jenis_palawija', 'jenis_horti', 'luas_hijau_ha', 'luas_kering_ha', 'luas_panen_ha', 'luas_puso_ha']));
         }
 
-        return view('laporan.form', compact('laporan', 'subs', 'sebelumnya'));
+        $laporan->pintu_air_id = $request->integer('petak') ?: null;
+        $petak = $this->petakPilihan($request->user(), $subs);
+
+        return view('laporan.form', compact('laporan', 'subs', 'sebelumnya', 'petak'));
     }
 
     public function store(Request $request)
@@ -75,8 +79,8 @@ class LaporanHarianController extends Controller
     public function show(LaporanHarian $laporan)
     {
         $this->authorize('view', $laporan);
-        $laporan->load('subDaerahIrigasi.daerahIrigasi.kabupaten', 'user', 'verifikator', 'foto');
-        $riwayat = LaporanHarian::where('sub_daerah_irigasi_id', $laporan->sub_daerah_irigasi_id)
+        $laporan->load('subDaerahIrigasi.daerahIrigasi.kabupaten', 'user', 'verifikator', 'foto', 'petak');
+        $riwayat = LaporanHarian::where('sub_daerah_irigasi_id', $laporan->sub_daerah_irigasi_id)->where('petak_kunci', $laporan->petak_kunci)
             ->where('tanggal', '<=', $laporan->tanggal)->latest('tanggal')->limit(14)->get()->reverse()->values();
 
         return view('laporan.show', compact('laporan', 'riwayat'));
@@ -88,8 +92,9 @@ class LaporanHarianController extends Controller
         $laporan->load('foto');
         $subs = $this->subPelaporan($request)->push($laporan->subDaerahIrigasi)->unique('id');
         $sebelumnya = null;
+        $petak = $this->petakPilihan($request->user(), $subs, $laporan);
 
-        return view('laporan.form', compact('laporan', 'subs', 'sebelumnya'));
+        return view('laporan.form', compact('laporan', 'subs', 'sebelumnya', 'petak'));
     }
 
     public function update(Request $request, LaporanHarian $laporan)
@@ -175,17 +180,17 @@ class LaporanHarianController extends Controller
     public function ekspor(Request $request): StreamedResponse
     {
         $nama = 'laporan-harian-'.now()->format('Ymd-His').'.csv';
-        $q = $this->query($request)->with(['subDaerahIrigasi.daerahIrigasi.kabupaten', 'user:id,name'])->orderBy('tanggal');
+        $q = $this->query($request)->with(['subDaerahIrigasi.daerahIrigasi.kabupaten', 'user:id,name', 'petak:id,kode'])->orderBy('tanggal');
 
         return response()->streamDownload(function () use ($q) {
             $out = fopen('php://output', 'w');
             fwrite($out, "\xEF\xBB\xBF"); // BOM agar Excel membaca UTF-8
-            fputcsv($out, ['Tanggal', 'Kabupaten', 'D.I.', 'Sub-D.I.', 'MT', 'Debit intake (L/dt)', 'TMA (cm)', 'Kondisi saluran', 'Bukaan pintu (%)', 'Fase', 'Luas tanam (Ha)', 'Padi (Ha)', 'Palawija (Ha)', 'Jenis palawija', 'Hortikultura (Ha)', 'Jenis hortikultura', 'Luas hijau (Ha)', 'Luas kekeringan (Ha)', 'Luas panen (Ha)', 'Luas puso (Ha)', 'Status', 'Kendala', 'Pelapor', 'Verifikasi', 'Lat', 'Lng'], ';');
+            fputcsv($out, ['Tanggal', 'Kabupaten', 'D.I.', 'Sub-D.I.', 'Petak tersier', 'MT', 'Debit intake (L/dt)', 'TMA (cm)', 'Kondisi saluran', 'Bukaan pintu (%)', 'Fase', 'Luas tanam (Ha)', 'Padi (Ha)', 'Palawija (Ha)', 'Jenis palawija', 'Hortikultura (Ha)', 'Jenis hortikultura', 'Luas hijau (Ha)', 'Luas kekeringan (Ha)', 'Luas panen (Ha)', 'Luas puso (Ha)', 'Status', 'Kendala', 'Pelapor', 'Verifikasi', 'Lat', 'Lng'], ';');
             $q->chunk(500, function ($rows) use ($out) {
                 foreach ($rows as $l) {
                     $s = $l->subDaerahIrigasi;
                     fputcsv($out, [
-                        $l->tanggal->format('Y-m-d'), $s->daerahIrigasi->kabupaten?->nama, $s->daerahIrigasi->nama, $s->nama, $l->mt,
+                        $l->tanggal->format('Y-m-d'), $s->daerahIrigasi->kabupaten?->nama, $s->daerahIrigasi->nama, $s->nama, $l->petak?->kode, $l->mt,
                         $l->debit_intake_lps, $l->tma_cm, $l->kondisi_saluran, $l->bukaan_pintu_persen, $l->fase_tanaman,
                         $l->luas_tanam_ha, $l->luas_padi_ha, $l->luas_palawija_ha, $l->jenis_palawija, $l->luas_horti_ha, $l->jenis_horti, $l->luas_hijau_ha, $l->luas_kering_ha, $l->luas_panen_ha, $l->luas_puso_ha,
                         StatusKondisi::label($l->status()), $l->kendala, $l->user?->name, $l->status_verifikasi, $l->lat, $l->lng,
@@ -242,12 +247,21 @@ class LaporanHarianController extends Controller
             }
         }
 
-        return $request->validate([
+        // petak tersier: wajib bagi PPA bila Sub-D.I. sudah punya petak tersier
+        $subId = $request->integer('sub_daerah_irigasi_id');
+        $pilihan = $subId ? ($this->petakPilihan($request->user(), SubDaerahIrigasi::whereKey($subId)->get(), $laporan)[$subId] ?? null) : null;
+        $wajibPetak = (bool) ($pilihan['wajib'] ?? false);
+        $idPetak = collect($pilihan['daftar'] ?? [])->pluck('id')->all();
+        $petakKunci = (int) $request->input('pintu_air_id') ?: 0;
+
+        $data = $request->validate([
             'tanggal' => ['required', 'date', 'before_or_equal:today', 'after_or_equal:'.$batasMundur],
             'sub_daerah_irigasi_id' => [
                 'required', 'exists:sub_daerah_irigasi,id',
-                Rule::unique('laporan_harian')->where(fn ($q) => $q->where('tanggal', rescue(fn () => Carbon::parse($request->input('tanggal'))->toDateString(), (string) $request->input('tanggal'), false)))->ignore($laporan?->id),
+                Rule::unique('laporan_harian')->where(fn ($q) => $q->where('tanggal', rescue(fn () => Carbon::parse($request->input('tanggal'))->toDateString(), (string) $request->input('tanggal'), false))
+                    ->where('petak_kunci', $petakKunci))->ignore($laporan?->id),
             ],
+            'pintu_air_id' => [Rule::requiredIf($wajibPetak), 'nullable', 'integer', Rule::in($idPetak)],
             'debit_intake_lps' => ['required', 'numeric', 'min:0', 'max:100000'],
             'tma_cm' => ['required', 'numeric', 'min:-1000', 'max:100000'],
             'kondisi_saluran' => ['required', Rule::in(array_keys(LaporanHarian::KONDISI))],
@@ -269,7 +283,9 @@ class LaporanHarianController extends Controller
             'foto' => ['nullable', 'array', 'max:'.max(0, $maksFoto)],
             'foto.*' => ['image', 'max:8192'],
         ], [
-            'sub_daerah_irigasi_id.unique' => 'Sub-D.I. ini sudah punya laporan pada tanggal tersebut. Buka laporan itu untuk mengubahnya.',
+            'sub_daerah_irigasi_id.unique' => $petakKunci ? 'Petak ini sudah punya laporan pada tanggal tersebut. Buka laporan itu untuk mengubahnya.' : 'Sub-D.I. ini sudah punya laporan pada tanggal tersebut. Buka laporan itu untuk mengubahnya.',
+            'pintu_air_id.required' => $idPetak ? 'Pilih petak tersier yang Anda laporkan.' : 'Anda belum ditugaskan ke petak tersier di Sub-D.I. ini. Minta Manager mengatur penugasan pintu air.',
+            'pintu_air_id.in' => 'Petak tersier ini bukan tugas Anda atau bukan bagian Sub-D.I. yang dipilih.',
             'tanggal.after_or_equal' => 'Laporan hanya bisa diisi untuk 7 hari terakhir.',
             'lte' => ':attribute tidak boleh lebih besar dari luas tanam.',
             'lat.between' => 'Lintang harus antara -12 dan -7 (wilayah NTT). Periksa koordinat.',
@@ -283,6 +299,45 @@ class LaporanHarianController extends Controller
             'jenis_palawija' => 'jenis palawija', 'jenis_horti' => 'jenis hortikultura', 'luas_hijau_ha' => 'luas hijau', 'luas_kering_ha' => 'luas kekeringan',
             'luas_panen_ha' => 'luas panen', 'luas_puso_ha' => 'luas puso', 'kondisi_saluran' => 'kondisi saluran',
         ]);
+
+        $data['pintu_air_id'] = $data['pintu_air_id'] ?? null;
+        $luasPetak = $data['pintu_air_id'] ? collect($pilihan['daftar'])->firstWhere('id', (int) $data['pintu_air_id'])['luas'] ?? null : null;
+        if ($luasPetak && (float) $data['luas_tanam_ha'] > $luasPetak * 1.05) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['luas_padi_ha' => 'Luas tanam melebihi luas layanan petak ('.angka_r($luasPetak).' Ha). Periksa kembali, atau minta Manager memperbarui luas layanan petak.']);
+        }
+
+        return $data;
+    }
+
+    /**
+     * Petak tersier yang bisa dipilih per Sub-D.I.: pintu tersier aktif yang ditugaskan kepada user
+     * atau belum ditugaskan ke siapa pun (pengelola: semua). Wajib dipilih oleh PPA bila Sub-D.I. punya petak.
+     *
+     * @return array<int, array{wajib: bool, daftar: array}>
+     */
+    private function petakPilihan(\App\Models\User $u, $subs, ?LaporanHarian $laporan = null): array
+    {
+        $subIds = collect($subs)->pluck('id')->all();
+        $semua = PintuAir::tersier()->whereIn('sub_daerah_irigasi_id', $subIds)
+            ->where(fn ($q) => $q->where('aktif', true)->when($laporan?->pintu_air_id, fn ($w) => $w->orWhere('id', $laporan->pintu_air_id)))
+            ->with('petugas:id', 'pembacaanTerakhir')->orderBy('urutan')->orderBy('kode')->get();
+        $hasil = [];
+        foreach ($subs as $sub) {
+            $daftar = $semua->where('sub_daerah_irigasi_id', $sub->id);
+            $kelola = $u->hasRole(...Role::PENGELOLA) || $u->bolehKelolaPintu((int) $sub->daerah_irigasi_id);
+            $boleh = $kelola ? $daftar : $daftar->filter(fn ($p) => $p->petugas->isEmpty() || $p->petugas->contains('id', $u->id) || $p->id === $laporan?->pintu_air_id);
+            $hasil[$sub->id] = [
+                'wajib' => $daftar->isNotEmpty() && $u->hasRole(Role::PETUGAS),
+                'daftar' => $boleh->map(fn ($p) => [
+                    'id' => $p->id, 'kode' => $p->kode, 'nama' => $p->nama, 'luas' => $p->luas_layanan_ha,
+                    'lat' => $p->lat, 'lng' => $p->lng, 'saya' => $p->petugas->contains('id', $u->id),
+                    'bacaan' => $p->pembacaanTerakhir && $p->pembacaanTerakhir->tanggal->gte(today()->subDays(2))
+                        ? ['debit' => $p->pembacaanTerakhir->debit_lps, 'tma' => $p->pembacaanTerakhir->tma_cm, 'tanggal' => $p->pembacaanTerakhir->tanggal->translatedFormat('d M')] : null,
+                ])->sortByDesc('saya')->values()->all(),
+            ];
+        }
+
+        return $hasil;
     }
 
     private function mt(array $data): ?int

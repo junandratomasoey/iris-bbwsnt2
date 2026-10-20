@@ -49,6 +49,24 @@ class PintuAirController extends Controller
         ]);
     }
 
+    public function neraca(Request $request)
+    {
+        $u = $request->user();
+        $diList = $this->svc->diList($u->diIdsTerjangkau())->where('pintu_air_count', '>', 0)->values();
+        $di = $diList->firstWhere('id', $request->integer('di')) ?? ($request->filled('di') ? abort(403) : $diList->first());
+        $senin = rescue(fn () => \Carbon\Carbon::parse($request->input('minggu'))->startOfWeek(\Carbon\Carbon::MONDAY), SesiPintu::seninIni(), false);
+        if (! $request->filled('minggu') || $senin->gt(today())) {
+            $senin = SesiPintu::seninIni();
+        }
+
+        return view('pintu.neraca', [
+            'di' => $di, 'diList' => $diList,
+            'n' => $di ? $this->svc->neraca($di->id, $senin, $u->subIdsTerjangkau()) : null,
+            'mingguList' => collect(range(0, 11))->map(fn ($i) => SesiPintu::seninIni()->subWeeks($i)),
+            'senin' => $senin,
+        ]);
+    }
+
     public function show(Request $request, PintuAir $pintu)
     {
         $u = $request->user();

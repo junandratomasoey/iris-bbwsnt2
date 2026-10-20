@@ -22,6 +22,16 @@ export function laporanForm(opsi) {
         baru: !!opsi.baru,
         sisaFoto: opsi.sisaFoto ?? MAKS_FOTO,
         luasSub: opsi.luasSub || {},
+        petakSub: opsi.petakSub || {},
+        get daftarPetak() { return this.petakSub[this.f.sub_daerah_irigasi_id]?.daftar || []; },
+        get petakWajib() { return !!this.petakSub[this.f.sub_daerah_irigasi_id]?.wajib; },
+        get petakTerpilih() { return this.daftarPetak.find((p) => String(p.id) === String(this.f.pintu_air_id)) || null; },
+        pakaiBacaan() {
+            const b = this.petakTerpilih?.bacaan;
+            if (!b) return;
+            if (b.debit !== null) this.f.debit_intake_lps = b.debit;
+            if (b.tma !== null) this.f.tma_cm = b.tma;
+        },
         f: opsi.awal,
         foto: [],          // {file, url, ukuran}
         memproses: false,
@@ -31,7 +41,7 @@ export function laporanForm(opsi) {
         kirim: false,
         pesanOffline: false,
 
-        get kunciDraf() { return `iris-draf-laporan-${this.f.sub_daerah_irigasi_id || 'x'}`; },
+        get kunciDraf() { return `iris-draf-laporan-${this.f.sub_daerah_irigasi_id || 'x'}-${this.f.pintu_air_id || 0}`; },
         pakai: { padi: false, palawija: false, horti: false },
         /** total = padi + palawija + hortikultura yang dicentang */
         get luasTanam() {
@@ -66,6 +76,8 @@ export function laporanForm(opsi) {
             return { gps: `Dari GPS HP${this.gps.akurasi ? ` (±${this.gps.akurasi} m)` : ''}`, peta: 'Dipilih di peta', ketik: 'Diketik manual', tersimpan: 'Titik tersimpan' }[this.lokasi] || '';
         },
         get peringatanLuas() {
+            const petak = this.petakTerpilih?.luas;
+            if (petak && this.luasTanam > petak * 1.05) return `Luas tanam melebihi luas layanan petak (${petak.toLocaleString('id-ID')} Ha). Periksa kembali.`;
             const luas = this.luasSub[this.f.sub_daerah_irigasi_id];
             if (luas && this.luasTanam > luas * 1.05) return `Luas tanam melebihi luas Sub-D.I. (${luas.toLocaleString('id-ID')} Ha). Periksa kembali.`;
             return null;
@@ -76,6 +88,11 @@ export function laporanForm(opsi) {
             ['padi', 'palawija', 'horti'].forEach((k) => { this.pakai[k] = (+this.f[`luas_${k}_ha`] || 0) > 0; });
             if (!this.pakai.palawija && !this.pakai.horti && !this.pakai.padi && (this.baru || +this.f.luas_tanam_ha > 0)) this.pakai.padi = true;
             if (this.pakai.padi && !(+this.f.luas_padi_ha) && +this.f.luas_tanam_ha > 0) this.f.luas_padi_ha = this.f.luas_tanam_ha;
+            this.$watch('f.sub_daerah_irigasi_id', () => {
+                if (this.f.pintu_air_id && !this.petakTerpilih) this.f.pintu_air_id = '';
+                if (!this.f.pintu_air_id && this.daftarPetak.length === 1) this.f.pintu_air_id = String(this.daftarPetak[0].id);
+            });
+            if (!this.f.pintu_air_id && this.daftarPetak.length === 1) this.f.pintu_air_id = String(this.daftarPetak[0].id);
             window.addEventListener('online', () => (this.online = true));
             window.addEventListener('offline', () => (this.online = false));
             if (opsi.hapusDraf) this.hapusDraf();
@@ -83,6 +100,7 @@ export function laporanForm(opsi) {
                 try { this.adaDraf = !!localStorage.getItem(this.kunciDraf); } catch (e) {}
                 this.$watch('f', () => this.simpanDraf(), { deep: true });
                 this.$watch('f.sub_daerah_irigasi_id', () => { try { this.adaDraf = !!localStorage.getItem(this.kunciDraf); } catch (e) {} });
+                this.$watch('f.pintu_air_id', () => { try { this.adaDraf = !!localStorage.getItem(this.kunciDraf); } catch (e) {} });
                 if (!this.f.lat) this.ambilGps(true);
             }
             this.$watch('f.lat', () => this.pasangPenanda());
@@ -149,7 +167,8 @@ export function laporanForm(opsi) {
             this.$nextTick(() => {
                 if (!peta) {
                     const ada = this.f.lat && this.f.lng && dalamNtt(+this.f.lat, +this.f.lng);
-                    const sub = this.titikSub[this.f.sub_daerah_irigasi_id];
+                    const pt = this.petakTerpilih;
+                    const sub = pt?.lat ? [pt.lat, pt.lng] : this.titikSub[this.f.sub_daerah_irigasi_id];
                     const pusat = ada ? [+this.f.lat, +this.f.lng] : (sub ? [sub[0], sub[1]] : [-9.6, 122.0]);
                     peta = L.map(this.$refs.petaLokasi, { scrollWheelZoom: false }).setView(pusat, ada ? 16 : (sub ? 14 : 7));
                     L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: 'Esri' }).addTo(peta);

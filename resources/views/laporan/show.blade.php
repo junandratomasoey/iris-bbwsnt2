@@ -4,7 +4,7 @@
     $maxDebit = max(1, $riwayat->max('debit_intake_lps'));
 @endphp
 <x-layouts.app :title="'Laporan '.$s->nama">
-<x-judul :judul="$s->nama" :sub="'D.I. '.$s->daerahIrigasi->nama.' · '.$laporan->tanggal->translatedFormat('l, d F Y')">
+<x-judul :judul="$s->nama.($laporan->petak ? ' · Petak '.$laporan->petak->kode : '')" :sub="'D.I. '.$s->daerahIrigasi->nama.($laporan->petak?->nama ? ' · '.$laporan->petak->nama : '').' · '.$laporan->tanggal->translatedFormat('l, d F Y')">
     @can('update', $laporan)<a href="{{ route('laporan.edit', $laporan) }}" class="btn-ghost"><x-ikon n="edit" class="h-4 w-4"/> Ubah</a>@endcan
     @can('delete', $laporan)
         <form method="POST" action="{{ route('laporan.destroy', $laporan) }}" onsubmit="return confirm('Hapus laporan ini beserta fotonya?')">@csrf @method('DELETE')
@@ -17,14 +17,14 @@
         <section class="panel p-5">
             <div class="flex flex-wrap items-center gap-2"><x-status :s="$laporan->status()"/><x-verifikasi :s="$laporan->status_verifikasi"/>@if($laporan->mt)<span class="chip-kosong">MT {{ ['', 'I', 'II', 'III'][$laporan->mt] }}</span>@endif</div>
             <dl class="mt-4 grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4">
-                <div><dt class="text-xs text-basalt-soft">Debit intake</dt><dd class="font-gauge text-2xl font-semibold">{{ angka($laporan->debit_intake_lps, 1) }} <span class="text-sm">L/dt</span></dd></div>
+                <div><dt class="text-xs text-basalt-soft">{{ $laporan->petak ? 'Debit pintu '.$laporan->petak->kode : 'Debit intake' }}</dt><dd class="font-gauge text-2xl font-semibold">{{ angka($laporan->debit_intake_lps, 1) }} <span class="text-sm">L/dt</span></dd></div>
                 <div><dt class="text-xs text-basalt-soft">TMA</dt><dd class="font-gauge text-2xl font-semibold">{{ angka($laporan->tma_cm, 1) }} <span class="text-sm">cm</span></dd></div>
                 <div><dt class="text-xs text-basalt-soft">Kondisi saluran</dt><dd class="font-gauge text-2xl font-semibold">{{ LH::KONDISI[$laporan->kondisi_saluran] ?? '-' }}</dd></div>
                 <div><dt class="text-xs text-basalt-soft">Bukaan pintu</dt><dd class="font-gauge text-2xl font-semibold">{{ $laporan->bukaan_pintu_persen !== null ? $laporan->bukaan_pintu_persen.' %' : '–' }}</dd></div>
             </dl>
             <dl class="mt-5 grid grid-cols-2 gap-x-6 gap-y-3 border-t border-savana-line pt-4 text-sm sm:grid-cols-3">
                 <div><dt class="text-basalt-soft">Fase tanaman</dt><dd class="font-medium">{{ LH::FASE[$laporan->fase_tanaman] ?? '–' }}</dd></div>
-                <div><dt class="text-basalt-soft">Luas tanam</dt><dd class="font-medium">{{ angka($laporan->luas_tanam_ha, 2) }} Ha @if($s->luas_ha)<span class="text-basalt-mute">dari {{ angka($s->luas_ha) }} Ha</span>@endif</dd></div>
+                <div><dt class="text-basalt-soft">Luas tanam</dt><dd class="font-medium">{{ angka($laporan->luas_tanam_ha, 2) }} Ha @if($laporan->petak?->luas_layanan_ha)<span class="text-basalt-mute">dari {{ angka_r($laporan->petak->luas_layanan_ha) }} Ha petak</span>@elseif($s->luas_ha)<span class="text-basalt-mute">dari {{ angka($s->luas_ha) }} Ha</span>@endif</dd></div>
                 <div class="col-span-2 sm:col-span-3"><dt class="text-basalt-soft">Komoditas</dt>
                     <dd class="mt-1 flex flex-wrap gap-2">
                         @forelse($laporan->komoditas() as $k)

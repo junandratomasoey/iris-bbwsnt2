@@ -10,19 +10,28 @@
     @else
         <ul class="grid gap-3 sm:grid-cols-2">
             @foreach($subs as $s)
-                @php $l = $hariIni->get($s->id); @endphp
-                <li class="panel flex items-center justify-between gap-3 p-4">
-                    <div class="min-w-0">
-                        <p class="truncate font-semibold">{{ $s->nama }}</p>
-                        <p class="text-xs text-basalt-soft">D.I. {{ $s->daerahIrigasi->nama }}@if($s->luas_ha) · {{ angka($s->luas_ha) }} Ha @endif</p>
-                        @if($l)<p class="mt-1 flex items-center gap-1 text-xs font-medium text-status-aman"><x-ikon n="cek" class="h-3.5 w-3.5"/> Terkirim · <x-verifikasi :s="$l->status_verifikasi"/></p>@endif
-                    </div>
-                    @if($l)
-                        <a href="{{ route('laporan.show', $l) }}" class="btn-ghost shrink-0">Lihat</a>
-                    @else
-                        <a href="{{ route('laporan.create', ['sub' => $s->id]) }}" class="btn-primary shrink-0"><x-ikon n="tambah" class="h-4 w-4"/> Lapor</a>
-                    @endif
-                </li>
+                @php
+                    $daftarPetak = $petakSaya->get($s->id, collect());
+                    $unit = $daftarPetak->isNotEmpty()
+                        ? $daftarPetak->map(fn ($p) => ['judul' => 'Petak '.$p->kode, 'sub' => $p->nama ?: $s->nama, 'luas' => $p->luas_layanan_ha, 'kunci' => $s->id.':'.$p->id, 'url' => route('laporan.create', ['sub' => $s->id, 'petak' => $p->id])])
+                        : collect([['judul' => $s->nama, 'sub' => null, 'luas' => $s->luas_ha, 'kunci' => $s->id.':0', 'url' => route('laporan.create', ['sub' => $s->id])]]);
+                @endphp
+                @foreach($unit as $u)
+                    @php $l = $hariIni->get($u['kunci']); @endphp
+                    <li class="panel flex items-center justify-between gap-3 p-4">
+                        <div class="min-w-0">
+                            <p class="truncate font-semibold">{{ $u['judul'] }}</p>
+                            <p class="text-xs text-basalt-soft">{{ $u['sub'] ? $s->nama.' · ' : '' }}D.I. {{ $s->daerahIrigasi->nama }}@if($u['luas']) · {{ angka_r($u['luas']) }} Ha @endif</p>
+                            @if(! $l && $daftarPetak->isEmpty() && $petakAdaDiSub->has($s->id))<p class="mt-1 text-xs text-status-siaga">Sub-D.I. ini dilaporkan per petak — minta Manager menugaskan petak Anda.</p>@endif
+                            @if($l)<p class="mt-1 flex items-center gap-1 text-xs font-medium text-status-aman"><x-ikon n="cek" class="h-3.5 w-3.5"/> Terkirim · <x-verifikasi :s="$l->status_verifikasi"/></p>@endif
+                        </div>
+                        @if($l)
+                            <a href="{{ route('laporan.show', $l) }}" class="btn-ghost shrink-0">Lihat</a>
+                        @else
+                            <a href="{{ $u['url'] }}" class="btn-primary shrink-0"><x-ikon n="tambah" class="h-4 w-4"/> Lapor</a>
+                        @endif
+                    </li>
+                @endforeach
             @endforeach
         </ul>
     @endif
@@ -30,7 +39,7 @@
 
 @if($pintu->isNotEmpty())
 <section class="mt-8" aria-labelledby="judul-pintu">
-    <h2 id="judul-pintu" class="mb-1 text-lg font-semibold">Pembacaan pintu air</h2>
+    <h2 id="judul-pintu" class="mb-1 text-lg font-semibold">Pembacaan pintu air saya</h2>
     <p class="mb-2 text-sm text-basalt-soft">Jadwal rutin setiap Senin. Di luar Senin, baca juga bila ada panen, pekerjaan di sawah, atau kejadian khusus.</p>
     <ul class="grid gap-3 sm:grid-cols-2">
         @foreach($pintu as $r)
@@ -55,7 +64,7 @@
         @forelse($riwayat as $l)
             <a href="{{ route('laporan.show', $l) }}" class="flex items-center justify-between gap-3 px-4 py-3 hover:bg-savana">
                 <span>
-                    <span class="block text-sm font-semibold">{{ $l->subDaerahIrigasi->nama }}</span>
+                    <span class="block text-sm font-semibold">{{ $l->subDaerahIrigasi->nama }}@if($l->petak) · Petak {{ $l->petak->kode }}@endif</span>
                     <span class="block text-xs text-basalt-soft">{{ $l->tanggal->translatedFormat('d M Y') }} · debit {{ angka($l->debit_intake_lps, 1) }} L/dt</span>
                 </span>
                 <span class="flex flex-col items-end gap-1"><x-status :s="$l->status()"/><x-verifikasi :s="$l->status_verifikasi"/></span>

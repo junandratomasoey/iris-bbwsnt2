@@ -8,6 +8,7 @@ use App\Models\PintuAir;
 use App\Models\SesiPintu;
 use App\Models\User;
 use App\Services\FotoService;
+use App\Services\PintuService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -18,7 +19,7 @@ use Illuminate\Validation\Rule;
  */
 class PembacaanPintuController extends Controller
 {
-    public function __construct(private FotoService $foto) {}
+    public function __construct(private FotoService $foto, private PintuService $svc) {}
 
     public function index(Request $request)
     {
@@ -55,7 +56,7 @@ class PembacaanPintuController extends Controller
         ]);
 
         return view('pintu.pembacaan.form', ['sesi' => $sesi, 'diList' => $diList, 'di' => $di]
-            + ($di ? $this->dataForm($u, $di->id) : ['pintu' => collect(), 'nilai' => []]));
+            + ($di ? $this->dataForm($u, $di->id) : ['pintu' => collect(), 'nilai' => [], 'adaTugas' => false]));
     }
 
     public function store(Request $request)
@@ -149,7 +150,7 @@ class PembacaanPintuController extends Controller
     /** D.I. yang punya pintu aktif dalam jangkauan isian user. */
     private function diBisaDiisi(User $u)
     {
-        $ids = PintuAir::terjangkau($u->subIdsPelaporan('isi-pintu'))->where('aktif', true)->distinct()->pluck('daerah_irigasi_id');
+        $ids = $this->svc->bolehIsi($u)->where('aktif', true)->distinct()->pluck('daerah_irigasi_id');
 
         return DaerahIrigasi::whereIn('id', $ids)->orderBy('nama')->get(['id', 'nama']);
     }
@@ -158,10 +159,14 @@ class PembacaanPintuController extends Controller
     private function dataForm(User $u, int $diId, ?SesiPintu $sesi = null): array
     {
         $ada = $sesi ? $sesi->pembacaan->keyBy('pintu_air_id') : collect();
-        $pintu = PintuAir::with('subDaerahIrigasi:id,nama', 'pembacaanTerakhir')
-            ->terjangkau($u->subIdsPelaporan('isi-pintu'))->where('daerah_irigasi_id', $diId)
+        $pintu = $this->svc->bolehIsi($u, $diId)->with('subDaerahIrigasi:id,nama', 'pembacaanTerakhir', 'petugas:id,name')
             ->where(fn ($q) => $q->where('aktif', true)->when($ada->isNotEmpty(), fn ($w) => $w->orWhereIn('id', $ada->keys())))
             ->urut()->get();
+        $kelola = $u->bolehKelolaPintu($diId);
+        $pintu->each(function (PintuAir $p) use ($u, $kelola) {
+            $p->setAttribute('tugas_saya', $p->petugas->contains('id', $u->id));
+            $p->setAttribute('boleh_titik', ! $p->lat || $kelola || $p->tugas_saya);
+        });
 
         $nilai = [];
         foreach ($pintu as $p) {
@@ -174,13 +179,13 @@ class PembacaanPintuController extends Controller
             ];
         }
 
-        return ['pintu' => $pintu, 'nilai' => $nilai];
+        return ['pintu' => $pintu, 'nilai' => $nilai, 'adaTugas' => $pintu->contains('tugas_saya', true)];
     }
 
     /** @return array{0: array, 1: array<int, array>} data sesi & baris pembacaan yang terisi */
     private function validasi(Request $request, User $u, int $diId, ?SesiPintu $sesi = null): array
     {
-        $bolehId = PintuAir::terjangkau($u->subIdsPelaporan('isi-pintu'))->where('daerah_irigasi_id', $diId)->pluck('id')->all();
+        $bolehId = $this->svc->bolehIsi($u, $diId)->pluck('id')->all();
         $sisaFoto = SesiPintu::MAKS_FOTO - ($sesi?->foto()->count() ?? 0);
         $data = $request->validate([
             'tanggal' => ['required', 'date', 'before_or_equal:today', 'after_or_equal:'.today()->subDays(30)->toDateString()],
@@ -192,6 +197,9 @@ class PembacaanPintuController extends Controller
             'baca.*.tma' => ['nullable', 'numeric', 'min:0', 'max:10000'],
             'baca.*.bukaan' => ['nullable', 'numeric', 'min:0', 'max:10000'],
             'baca.*.catatan' => ['nullable', 'string', 'max:255'],
+            'baca.*.lat' => ['nullable', 'required_with:baca.*.lng', 'numeric', 'between:-12,-7'],
+            'baca.*.lng' => ['nullable', 'required_with:baca.*.lat', 'numeric', 'between:118,126'],
+            'baca.*.akurasi' => ['nullable', 'numeric', 'min:0', 'max:100000'],
             'foto' => ['nullable', 'array', 'max:'.max(0, $sisaFoto)],
             'foto.*' => ['image', 'max:8192'],
         ], [
@@ -202,22 +210,55 @@ class PembacaanPintuController extends Controller
             'foto.max' => 'Maksimal '.SesiPintu::MAKS_FOTO.' foto per pembacaan.',
             'baca.*.debit.numeric' => 'Debit harus angka.',
             'baca.*.tma.numeric' => 'TMA harus angka.',
+            'baca.*.lat.between' => 'Titik GPS di luar wilayah NTT.',
+            'baca.*.lng.between' => 'Titik GPS di luar wilayah NTT.',
         ]);
 
         $baris = [];
+        $titik = [];
         foreach ($data['baca'] ?? [] as $id => $r) {
             $isi = collect($r)->only(['debit', 'tma', 'bukaan'])->filter(fn ($v) => $v !== null && $v !== '');
-            if ($isi->isEmpty()) {
+            $adaTitik = is_numeric($r['lat'] ?? null) && is_numeric($r['lng'] ?? null);
+            if ($isi->isEmpty() && ! $adaTitik) {
                 continue;
             }
-            abort_unless(in_array((int) $id, $bolehId, true), 403, 'Pintu di luar wilayah tugas Anda.');
-            $baris[(int) $id] = $r;
+            abort_unless(in_array((int) $id, $bolehId, true), 403, 'Pintu di luar tugas Anda.');
+            if ($isi->isNotEmpty()) {
+                $baris[(int) $id] = $r;
+            }
+            if ($adaTitik) {
+                $titik[(int) $id] = $r;
+            }
         }
-        if (! $baris) {
+        if (! $baris && ! $titik) {
             throw \Illuminate\Validation\ValidationException::withMessages(['baca' => 'Isi debit atau TMA minimal satu pintu.']);
+        }
+        $this->simpanTitik($u, $titik);
+        if (! $baris) {
+            throw new \Illuminate\Http\Exceptions\HttpResponseException(
+                redirect()->route('pintu.index', ['di' => $diId])->with('ok', count($titik).' titik pintu disimpan (tanpa pembacaan).'));
         }
 
         return [$data, $baris];
+    }
+
+    /** Titik pintu dari GPS petugas di lapangan. */
+    private function simpanTitik(User $u, array $titik): void
+    {
+        if (! $titik) {
+            return;
+        }
+        foreach (PintuAir::whereIn('id', array_keys($titik))->get() as $p) {
+            if (! $this->svc->bolehTitik($u, $p)) {
+                continue;
+            }
+            $r = $titik[$p->id];
+            $p->update([
+                'lat' => round((float) $r['lat'], 7), 'lng' => round((float) $r['lng'], 7),
+                'titik_oleh' => $u->id, 'titik_pada' => now(),
+                'titik_akurasi_m' => is_numeric($r['akurasi'] ?? null) ? (int) min(65535, round($r['akurasi'])) : null,
+            ]);
+        }
     }
 
     private function simpanBaris(SesiPintu $sesi, array $baris): void

@@ -4,6 +4,7 @@
     $awal = [
         'tanggal' => old('tanggal', optional($laporan->tanggal)->toDateString() ?? today()->toDateString()),
         'sub_daerah_irigasi_id' => (string) old('sub_daerah_irigasi_id', $laporan->sub_daerah_irigasi_id),
+        'pintu_air_id' => (string) old('pintu_air_id', $laporan->pintu_air_id),
         'debit_intake_lps' => old('debit_intake_lps', $laporan->debit_intake_lps),
         'tma_cm' => old('tma_cm', $laporan->tma_cm),
         'kondisi_saluran' => old('kondisi_saluran', $laporan->kondisi_saluran),
@@ -30,7 +31,7 @@
 @endphp
 <x-layouts.app :title="$baru ? 'Isi laporan harian' : 'Ubah laporan'">
 <div class="mx-auto max-w-2xl">
-<x-judul :judul="$baru ? 'Laporan harian' : 'Ubah laporan'" sub="Isi kondisi air dan lahan Sub-D.I. hari ini. Kolom bertanda * wajib diisi."/>
+<x-judul :judul="$baru ? 'Laporan harian' : 'Ubah laporan'" sub="Isi kondisi air dan tanaman di petak/Sub-D.I. tugas Anda hari ini. Kolom bertanda * wajib diisi."/>
 
 @if(! $baru && $laporan->status_verifikasi === 'perbaikan')
     <div class="mb-4 rounded-md border border-[#E9B7B3] bg-[#FBECEA] px-4 py-3 text-sm text-[#7E1A14]">
@@ -41,7 +42,7 @@
 
 <form method="POST" enctype="multipart/form-data"
       action="{{ $baru ? route('laporan.store') : route('laporan.update', $laporan) }}"
-      x-data="laporanForm({ baru: {{ $baru ? 'true' : 'false' }}, awal: @js($awal), sisaFoto: {{ $sisaFoto }}, luasSub: @js($luasSub), titikSub: @js($titikSub) })"
+      x-data="laporanForm({ baru: {{ $baru ? 'true' : 'false' }}, awal: @js($awal), sisaFoto: {{ $sisaFoto }}, luasSub: @js($luasSub), titikSub: @js($titikSub), petakSub: @js($petak) })"
       @submit="kirimForm" class="space-y-5">
     @csrf @if(! $baru) @method('PUT') @endif
 
@@ -69,15 +70,33 @@
                 <input id="tanggal" type="date" name="tanggal" x-model="f.tanggal" max="{{ today()->toDateString() }}" required class="input py-2.5">
             </x-field>
         </div>
+        <div x-show="daftarPetak.length || petakWajib" x-cloak>
+            <div>
+                <label for="pintu_air_id" class="label">Petak tersier yang dilaporkan<span x-show="petakWajib" class="text-status-kritis"> *</span></label>
+                <select id="pintu_air_id" name="pintu_air_id" x-model="f.pintu_air_id" :required="petakWajib" class="input py-2.5">
+                    <option value="" x-text="petakWajib ? 'Pilih petak tersier' : '— Seluruh Sub-D.I. —'"></option>
+                    <template x-for="p in daftarPetak" :key="p.id">
+                        <option :value="String(p.id)" :selected="String(p.id) === String(f.pintu_air_id)" x-text="p.kode + (p.nama ? ' · ' + p.nama : '') + (p.luas ? ' (' + p.luas.toLocaleString('id-ID') + ' Ha)' : '') + (p.saya ? ' — tugas saya' : '')"></option>
+                    </template>
+                </select>
+                <p x-show="petakWajib && !daftarPetak.length" class="mt-1 text-xs font-medium text-status-kritis">Anda belum ditugaskan ke petak tersier di Sub-D.I. ini. Minta Manager mengatur penugasan pintu air.</p>
+                <p x-show="petakTerpilih" class="mt-1 text-xs text-basalt-mute">Kondisi tanaman diisi untuk petak ini saja<span x-show="petakTerpilih?.luas" x-text="' (luas layanan ' + (petakTerpilih?.luas ?? 0).toLocaleString('id-ID') + ' Ha)'"></span>. Satu laporan per petak per hari.</p>
+                @error('pintu_air_id')<p class="mt-1 text-xs font-medium text-status-kritis">{{ $message }}</p>@enderror
+            </div>
+        </div>
         @if($sebelumnya)
             <p class="text-xs text-basalt-mute">Angka awal disalin dari laporan {{ $sebelumnya->tanggal->translatedFormat('d M Y') }}. Ubah yang berbeda hari ini.</p>
         @endif
     </fieldset>
 
     <fieldset class="panel space-y-4 p-4 sm:p-5">
-        <legend class="float-left mb-1 font-gauge text-lg font-semibold">Air di intake dan saluran</legend>
+        <legend class="float-left mb-1 font-gauge text-lg font-semibold" x-text="petakTerpilih ? 'Air di pintu tersier ' + petakTerpilih.kode : 'Air di intake dan saluran'">Air di intake dan saluran</legend>
+        <p x-show="petakTerpilih?.bacaan" x-cloak class="clear-left rounded-md bg-saluran-50 px-3 py-2 text-xs">
+            Pembacaan pintu <b x-text="petakTerpilih?.kode"></b> tanggal <span x-text="petakTerpilih?.bacaan?.tanggal"></span>: debit <b x-text="petakTerpilih?.bacaan?.debit ?? '–'"></b> L/dt, TMA <b x-text="petakTerpilih?.bacaan?.tma ?? '–'"></b> cm.
+            <button type="button" class="font-semibold text-saluran-600 underline" @click="pakaiBacaan()">Pakai angka ini</button>
+        </p>
         <div class="clear-left grid grid-cols-2 gap-4">
-            <x-field name="debit_intake_lps" label="Debit intake (L/detik)" wajib>
+            <x-field name="debit_intake_lps" label="Debit (L/detik)" wajib hint="Intake, atau pintu tersier bila melapor per petak.">
                 <input id="debit_intake_lps" name="debit_intake_lps" type="number" step="0.01" min="0" inputmode="decimal" x-model="f.debit_intake_lps" required class="input py-2.5 text-lg tabular-nums">
             </x-field>
             <x-field name="tma_cm" label="TMA (cm)" wajib>

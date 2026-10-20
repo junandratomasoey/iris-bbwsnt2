@@ -3,10 +3,10 @@
 <x-judul judul="Tambah pintu air" sub="D.I. {{ $di->nama }} — isi beberapa pintu sekaligus. Baris tanpa kode diabaikan."/>
 
 @php
-    $awal = old('pintu', [['kode' => '', 'nama' => '', 'jenis' => 'sadap', 'sub_daerah_irigasi_id' => '', 'saluran' => '', 'luas_layanan_ha' => '', 'debit_min_lps' => '', 'debit_maks_lps' => '', 'tma_min_cm' => '', 'tma_maks_cm' => '']]);
+    $awal = old('pintu', [['kode' => '', 'nama' => '', 'jenis' => 'sadap', 'tingkat' => 'tersier', 'hulu_id' => '', 'sub_daerah_irigasi_id' => '', 'saluran' => '', 'luas_layanan_ha' => '', 'debit_min_lps' => '', 'debit_maks_lps' => '', 'tma_min_cm' => '', 'tma_maks_cm' => '']]);
 @endphp
 <form method="POST" action="{{ route('master.pintu-air.store') }}" x-data="{ baris: @js(array_values($awal)), kirim: false,
-        tambah() { const b = this.baris[this.baris.length - 1] || {}; this.baris.push({ kode: '', nama: '', jenis: b.jenis || 'sadap', sub_daerah_irigasi_id: b.sub_daerah_irigasi_id || '', saluran: b.saluran || '', luas_layanan_ha: '', debit_min_lps: '', debit_maks_lps: '', tma_min_cm: '', tma_maks_cm: '' }); this.$nextTick(() => [...this.$el.querySelectorAll('[data-kode]')].pop()?.focus()) } }"
+        tambah() { const b = this.baris[this.baris.length - 1] || {}; this.baris.push({ kode: '', nama: '', jenis: b.jenis || 'sadap', tingkat: b.tingkat || 'tersier', hulu_id: b.hulu_id || '', sub_daerah_irigasi_id: b.sub_daerah_irigasi_id || '', saluran: b.saluran || '', luas_layanan_ha: '', debit_min_lps: '', debit_maks_lps: '', tma_min_cm: '', tma_maks_cm: '' }); this.$nextTick(() => [...this.$el.querySelectorAll('[data-kode]')].pop()?.focus()) } }"
       @submit="kirim = true">
     @csrf
     <input type="hidden" name="daerah_irigasi_id" value="{{ $di->id }}">
@@ -19,7 +19,7 @@
     @endif
 
     <div class="panel mb-3 p-3 text-sm text-basalt-soft">
-        <p><strong>Kode</strong> mengikuti nomenklatur skema jaringan (mis. <em>BOs.1 ki</em>, <em>BSa 2</em>). <strong>Rentang normal</strong> debit/TMA dipakai untuk menandai pembacaan kurang atau berlebih — isi dari kebutuhan air/rencana pembagian air; boleh dikosongkan dulu dan diisi kemudian.</p>
+        <p><strong>Kode</strong> mengikuti nomenklatur skema jaringan (mis. <em>BOs.1 ki</em>, <em>BSa 2</em>). <strong>Tingkat & pintu hulu</strong> menyusun aliran bendung → primer → sekunder → tersier agar debit bisa dicocokkan (neraca air). Pintu <strong>tersier</strong> mewakili satu petak tersier untuk laporan kondisi tanaman PPA. Pintu baru yang belum ada di daftar hulu bisa diatur hulunya setelah disimpan. <strong>Rentang normal</strong> debit/TMA dipakai untuk menandai pembacaan kurang atau berlebih — isi dari kebutuhan air/rencana pembagian air; boleh dikosongkan dulu dan diisi kemudian.</p>
         @if($kodeAda->isNotEmpty())<p class="mt-1 text-xs">Kode yang sudah ada: {{ $kodeAda->implode(', ') }}</p>@endif
     </div>
 
@@ -33,7 +33,11 @@
                     <input class="input" :name="`pintu[${i}][nama]`" x-model="b.nama" maxlength="255" placeholder="Pintu sadap tersier Oesao 1 kiri"></label>
                 <label class="lg:col-span-2"><span class="label">Jenis</span>
                     <select class="input" :name="`pintu[${i}][jenis]`" x-model="b.jenis">@foreach(PintuAir::JENIS as $k => $l)<option value="{{ $k }}">{{ $l }}</option>@endforeach</select></label>
-                <label class="lg:col-span-2"><span class="label">Sub-D.I.</span>
+                <label class="lg:col-span-2"><span class="label">Tingkat jaringan</span>
+                    <select class="input" :name="`pintu[${i}][tingkat]`" x-model="b.tingkat">@foreach(PintuAir::TINGKAT as $k => $l)<option value="{{ $k }}">{{ $l }}</option>@endforeach</select></label>
+                <label class="lg:col-span-3"><span class="label">Menerima air dari (pintu hulu)</span>
+                    <select class="input" :name="`pintu[${i}][hulu_id]`" x-model="b.hulu_id"><option value="">— (paling hulu)</option>@foreach($huluList as $h)<option value="{{ $h->id }}">{{ $h->kode }} · {{ $h->tingkat_label }}</option>@endforeach</select></label>
+                <label class="lg:col-span-3"><span class="label">Sub-D.I.</span>
                     <select class="input" :name="`pintu[${i}][sub_daerah_irigasi_id]`" x-model="b.sub_daerah_irigasi_id"><option value="">Tingkat D.I.</option>@foreach($subList as $s)<option value="{{ $s->id }}">{{ $s->nama }}</option>@endforeach</select></label>
                 <label class="lg:col-span-3"><span class="label">Saluran yang dialiri</span>
                     <input class="input" :name="`pintu[${i}][saluran]`" x-model="b.saluran" maxlength="255" placeholder="Saluran sekunder Oesao"></label>
@@ -43,7 +47,7 @@
                     <div class="flex items-center gap-2"><input class="input" type="number" step="any" min="0" inputmode="decimal" :name="`pintu[${i}][debit_min_lps]`" x-model="b.debit_min_lps" placeholder="min" aria-label="Debit minimum"><span>–</span><input class="input" type="number" step="any" min="0" inputmode="decimal" :name="`pintu[${i}][debit_maks_lps]`" x-model="b.debit_maks_lps" placeholder="maks" aria-label="Debit maksimum"></div></div>
                 <div class="sm:col-span-2 lg:col-span-4"><span class="label">TMA normal (cm)</span>
                     <div class="flex items-center gap-2"><input class="input" type="number" step="any" min="0" inputmode="decimal" :name="`pintu[${i}][tma_min_cm]`" x-model="b.tma_min_cm" placeholder="min" aria-label="TMA minimum"><span>–</span><input class="input" type="number" step="any" min="0" inputmode="decimal" :name="`pintu[${i}][tma_maks_cm]`" x-model="b.tma_maks_cm" placeholder="maks" aria-label="TMA maksimum"></div></div>
-                <div class="flex items-end justify-end lg:col-span-2">
+                <div class="flex items-end justify-end lg:col-span-8">
                     <button type="button" class="text-sm font-medium text-status-kritis" x-show="baris.length > 1" @click="baris.splice(i, 1)">Hapus baris</button>
                 </div>
             </fieldset>

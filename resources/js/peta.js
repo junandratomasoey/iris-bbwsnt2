@@ -91,6 +91,26 @@ function siapkanGaleri(g) {
     return { ...g, semua, galeri: JSON.stringify(semua.map((f) => ({ besar: f.besar, label: f.label }))) };
 }
 
+const WARNA_PINTU = { kurang: '#D9622B', rendah: '#D9622B', berlebih: '#3D7DB3', tinggi: '#3D7DB3', normal: '#4E8A2E' };
+const LABEL_PINTU = { kurang: 'kurang', rendah: 'rendah', berlebih: 'berlebih', tinggi: 'tinggi', normal: 'normal' };
+const angkaId = (v) => (v === null || v === undefined ? '–' : Number(v).toLocaleString('id-ID', { maximumFractionDigits: 2 }));
+
+/** Warna pintu: debit lebih menentukan; bila debit belum dinilai, pakai TMA. */
+function warnaPintu(p) {
+    return WARNA_PINTU[p.status_debit] || WARNA_PINTU[p.status_tma] || '#6B7A80';
+}
+
+function popupPintu(p) {
+    const st = (s) => (s ? ` <b style="color:${WARNA_PINTU[s]}">${LABEL_PINTU[s]}</b>` : '');
+    return `<div style="font-size:12px;line-height:1.45">
+        <div style="font-weight:700;font-size:13px">Pintu ${esc(p.kode)}</div>
+        <div style="color:#4A585E">${esc(p.tingkat_label)}${p.nama ? ' · ' + esc(p.nama) : ''}</div>
+        ${p.tanggal ? `<div style="margin-top:4px">Debit ${angkaId(p.debit)} L/dt${st(p.status_debit)}<br>TMA ${angkaId(p.tma)} cm${st(p.status_tma)}<br><span style="color:#4A585E">dibaca ${esc(p.tanggal)}</span></div>` : '<div style="margin-top:4px;color:#8A3510">Belum ada pembacaan</div>'}
+        ${p.petugas ? `<div style="color:#4A585E">Petugas: ${esc(p.petugas)}</div>` : ''}
+        <a href="${p.url}" style="display:inline-block;margin-top:6px;font-weight:600;color:#0F5E6E">Riwayat pintu</a>
+    </div>`;
+}
+
 function popupBangunan(b) {
     return `<div style="min-width:200px;max-width:240px;font-size:12px">
         <div style="font-weight:700;font-size:13px">${esc(b.nama)}</div>
@@ -136,6 +156,7 @@ export function createMap(opsi) {
     let aturTitikFn = null;
     const markerKejadian = new Map(); // id → marker, untuk membuka popup dari daftar
     const markerBangunan = new Map();
+    const markerPintu = new Map();
     const URUT_KEJADIAN = { 'Perlu Penanganan': 0, 'Dalam Penanganan': 1, 'Selesai Ditangani': 2, 'Tidak Perlu Penanganan': 3 };
     const normal = (t) => String(t ?? '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/^(d\.?\s*i\.?\s+)/, '');
 
@@ -438,6 +459,7 @@ export function createMap(opsi) {
                     ada_fungsional: (geo.fungsional?.features || []).some((f) => f.properties.kode === kode) };
                 if (ganti && !this.detail.foto_harian.length) this.detailTab = 'sub';
                 this.gambarBangunanDi();
+                this.gambarPintuDi();
             } catch (e) {
                 this.detailGalat = 'Detail D.I. gagal dimuat.';
             }
@@ -447,7 +469,7 @@ export function createMap(opsi) {
         tutupDetail() {
             this.detailId = null;
             this.detail = null;
-            ['sorot', 'bangunanDi'].forEach((k) => { if (layers[k]) { map.removeLayer(layers[k]); layers[k] = null; } });
+            ['sorot', 'bangunanDi', 'pintuDi'].forEach((k) => { if (layers[k]) { map.removeLayer(layers[k]); layers[k] = null; } });
         },
 
         async muatFotoLama() {
@@ -516,6 +538,34 @@ export function createMap(opsi) {
             });
             layers.bangunanDi = lyr.addTo(map);
         },
+
+        /** Pintu air D.I. terpilih (internal): titik berwarna status + garis aliran dari pintu hulunya. */
+        gambarPintuDi() {
+            if (layers.pintuDi) { map.removeLayer(layers.pintuDi); layers.pintuDi = null; }
+            markerPintu.clear();
+            const daftar = this.detail?.pintu || [];
+            if (!daftar.length) return;
+            const lyr = L.layerGroup();
+            const jari = { utama: 9, primer: 8, sekunder: 7, tersier: 6 };
+            daftar.forEach((p) => {
+                if (p.hulu) L.polyline([p.hulu, [p.lat, p.lng]], { color: '#0F5E6E', weight: p.tingkat === 'tersier' ? 1.5 : 2.5, opacity: 0.8, dashArray: p.tingkat === 'tersier' ? '3 4' : null, interactive: false }).addTo(lyr);
+            });
+            daftar.forEach((p) => {
+                const m = L.circleMarker([p.lat, p.lng], { radius: jari[p.tingkat] || 6, color: '#fff', weight: 2, fillColor: warnaPintu(p), fillOpacity: 1, pane: 'markerPane' })
+                    .bindPopup(popupPintu(p), { maxWidth: 260 }).bindTooltip('Pintu ' + p.kode, { direction: 'top' }).addTo(lyr);
+                markerPintu.set(p.id, m);
+            });
+            layers.pintuDi = lyr.addTo(map);
+        },
+
+        fokusPintu(p) {
+            if (!p.lat) return;
+            if (window.innerWidth < 1024) this.panel = false;
+            map.flyTo([p.lat, p.lng], Math.max(map.getZoom(), 16), { duration: 0.8 });
+            setTimeout(() => markerPintu.get(p.id)?.openPopup(), 850);
+        },
+
+        warnaPintu,
 
         fokusBangunan(b) {
             if (!b.lat) return;

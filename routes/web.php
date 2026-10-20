@@ -56,6 +56,7 @@ Route::middleware(['auth', 'siap'])->group(function () {
     Route::resource('kejadian', KejadianController::class)->parameters(['kejadian' => 'kejadian']);
 
     Route::get('/pintu-air', [PintuAirController::class, 'index'])->name('pintu.index');
+    Route::get('/pintu-air/neraca', [PintuAirController::class, 'neraca'])->name('pintu.neraca');
     Route::get('/pintu-air/{pintu}', [PintuAirController::class, 'show'])->name('pintu.show')->whereNumber('pintu');
     Route::delete('/pembacaan-pintu/{sesi}/foto/{foto}', [PembacaanPintuController::class, 'hapusFoto'])->name('pembacaan-pintu.foto.destroy');
     Route::resource('pembacaan-pintu', PembacaanPintuController::class)->parameters(['pembacaan-pintu' => 'sesi']);
@@ -73,6 +74,8 @@ Route::middleware(['auth', 'siap'])->group(function () {
             ->parameters(['daerah-irigasi' => 'di', 'sub' => 'sub'])->except(['index', 'show'])->shallow();
         Route::post('daerah-irigasi/{di}/skema', [MasterPintuAirController::class, 'skemaStore'])->name('skema.store');
         Route::delete('skema/{skema}', [MasterPintuAirController::class, 'skemaDestroy'])->name('skema.destroy');
+        Route::get('pintu-air/penugasan', [MasterPintuAirController::class, 'penugasan'])->name('pintu-air.penugasan');
+        Route::post('pintu-air/penugasan', [MasterPintuAirController::class, 'simpanPenugasan'])->name('pintu-air.penugasan.simpan');
         Route::resource('pintu-air', MasterPintuAirController::class)->parameters(['pintu-air' => 'pintu'])->except(['index', 'show']);
         Route::resource('jadwal-tanam', JadwalTanamController::class)->parameters(['jadwal-tanam' => 'jadwal'])->except(['show']);
         Route::resource('p3a', P3aController::class)->except(['show']);
