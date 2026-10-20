@@ -1,5 +1,5 @@
 {{-- Peta bersama untuk halaman publik & internal. Variabel: $internal, $api --}}
-<div x-data="peta({ internal: {{ $internal ? 'true' : 'false' }}, api: '{{ $api }}', apiDetail: '{{ $apiDetail }}' })" class="relative flex h-full min-h-0">
+<div x-data="peta({ internal: {{ $internal ? 'true' : 'false' }}, api: '{{ $api }}', apiDetail: '{{ $apiDetail }}', satgasKabupaten: @js($satgasKabupaten ?? []) })" class="relative flex h-full min-h-0">
     {{-- panel samping: daftar & filter, atau detail D.I. terpilih --}}
     <aside x-show="panel" x-cloak x-ref="panel"
            :class="detailId ? 'w-full sm:w-[26rem]' : 'w-[22rem] max-w-[90vw]'"
@@ -67,6 +67,8 @@
                     <select x-model="satgas" class="input"><option value="">Semua</option>
                         @foreach($satgasList as $s)<option value="{{ $s->kode }}">Wilayah {{ $s->kode }}</option>@endforeach
                     </select></label>
+                <p x-show="satgas" x-cloak class="col-span-2 -mt-1 text-xs text-basalt-soft"
+                   x-text="'Cakupan Satgas ' + satgas + ': ' + ((opsiSatgas[satgas] || []).join(', ') || '–')"></p>
             </div>
             <fieldset>
                 <legend class="label">Status</legend>

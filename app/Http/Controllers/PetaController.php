@@ -208,6 +208,9 @@ class PetaController extends Controller
         return [
             'kabupatenList' => Kabupaten::whereHas('daerahIrigasi')->orderBy('nama')->pluck('nama'),
             'satgasList' => WilayahSatgas::orderBy('id')->get(['kode', 'cakupan']),
+            // kabupaten cakupan tiap satgas, untuk menyorot wilayahnya di peta
+            'satgasKabupaten' => WilayahSatgas::with('kabupaten:id,nama,wilayah_satgas_id')->get()
+                ->mapWithKeys(fn ($w) => [$w->kode => $w->kabupaten->pluck('nama')->values()->all()]),
         ];
     }
 }

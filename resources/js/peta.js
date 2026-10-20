@@ -176,6 +176,7 @@ export function createMap(opsi) {
         },
         kabupaten: '',
         satgas: '',
+        opsiSatgas: opsi.satgasKabupaten || {},
         status: { aman: true, waspada: true, siaga: true, kritis: true, kosong: true },
         lapis: { wilayah: true, fungsional: true, baku: false, potensial: false, sub: !!opsi.internal, kejadian: true, bangunan: false },
         data: null,
@@ -208,8 +209,9 @@ export function createMap(opsi) {
         get kejadianTampil() {
             if (!this.data) return [];
             const kata = normal(this.cari).trim().split(/\s+/).filter(Boolean);
+            const sorot = this.kabupatenSorot();   // kabupaten terpilih / cakupan satgas terpilih
             return this.data.kejadian
-                .filter((k) => !this.kabupaten || k.kabupaten === this.kabupaten)
+                .filter((k) => !sorot || sorot.has(k.kabupaten))
                 .filter((k) => !this.statusKejadian || k.status === this.statusKejadian)
                 .filter((k) => {
                     if (!kata.length) return true;
@@ -270,7 +272,7 @@ export function createMap(opsi) {
             });
             if (this.periode === 'rentang' && !this.dari) this.dari = this.sampai;
             ['kabupaten', 'satgas', 'status', 'lapis', 'statusKejadian'].forEach((k) => this.$watch(k, () => this.gambar(), { deep: true }));
-            this.$watch('kabupaten', () => this.gayaWilayah());
+            ['kabupaten', 'satgas'].forEach((k) => this.$watch(k, () => { this.gayaWilayah(); this.terbangWilayah(); }));
             let jeda = null;
             this.$watch('cari', () => { clearTimeout(jeda); jeda = setTimeout(() => this.gambarKejadian(), 250); });
         },
@@ -300,14 +302,30 @@ export function createMap(opsi) {
                 if (this.lapis.wilayah) wilayah.addTo(map);
             } catch (e) { wilayah = null; }
         },
+        /** Kabupaten yang disorot: kabupaten terpilih dan/atau seluruh kabupaten cakupan satgas terpilih. */
+        kabupatenSorot() {
+            if (!this.kabupaten && !this.satgas) return null;
+            let daftar = this.satgas ? (opsi.satgasKabupaten?.[this.satgas] || []) : null;
+            if (this.kabupaten) daftar = daftar ? daftar.filter((k) => k === this.kabupaten) : [this.kabupaten];
+            return new Set(daftar);
+        },
         gayaWilayah() {
             if (!wilayah) return;
-            const pilih = this.kabupaten;
+            const sorot = this.kabupatenSorot();
             wilayah.setStyle((f) => {
                 const nama = f.properties.nama.replace(/^Kabupaten\s+/, '');
-                const aktif = !pilih || nama === pilih;
-                return { color: '#ffffff', weight: aktif && pilih ? 1.6 : 0.8, fillColor: WARNA_NTT, fillOpacity: aktif ? 0.7 : 0.22 };
+                const aktif = !sorot || sorot.has(nama);
+                return { color: '#ffffff', weight: aktif && sorot ? 1.6 : 0.8, fillColor: WARNA_NTT, fillOpacity: aktif ? 0.7 : 0.22 };
             });
+        },
+        /** Arahkan peta ke wilayah yang disorot; kembali ke seluruh NTT bila filter dikosongkan. */
+        terbangWilayah() {
+            if (!wilayah || !map) return;
+            const sorot = this.kabupatenSorot();
+            if (!sorot) { map.flyToBounds(BATAS_NTT, { padding: [8, 8], duration: 0.8 }); return; }
+            const b = L.latLngBounds([]);
+            wilayah.eachLayer((l) => { if (sorot.has(l.feature.properties.nama.replace(/^Kabupaten\s+/, ''))) b.extend(l.getBounds()); });
+            if (b.isValid()) map.flyToBounds(b, { padding: [30, 30], maxZoom: 11, duration: 0.8 });
         },
 
         gambar() {
