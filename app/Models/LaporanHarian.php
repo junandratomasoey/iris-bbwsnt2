@@ -55,6 +55,12 @@ class LaporanHarian extends Model
         return $this->belongsTo(SubDaerahIrigasi::class);
     }
 
+    /** Debit & TMA pintu yang diisi bersama laporan ini. */
+    public function sesiPintu(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(SesiPintu::class);
+    }
+
     /** Petak tersier (diwakili pintu tersiernya). */
     public function petak(): BelongsTo
     {

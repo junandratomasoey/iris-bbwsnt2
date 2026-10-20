@@ -34,7 +34,7 @@
         <x-field name="jenis" label="Alasan pembacaan" wajib class="sm:col-span-2">
             <select id="jenis" name="jenis" x-model="jenis" class="input" required>
                 <option value="">Pilih…</option>
-                @foreach(SesiPintu::JENIS as $k => $l)<option value="{{ $k }}">{{ $l }}</option>@endforeach
+                @foreach(SesiPintu::jenisPilihan() as $k => $l)<option value="{{ $k }}">{{ $l }}</option>@endforeach
             </select>
             <p x-show="jenis === 'rutin' && !hariSenin()" x-cloak class="mt-1 text-xs text-status-siaga">Tanggal ini bukan hari Senin — tetap tercatat sebagai pembacaan rutin (terlambat).</p>
         </x-field>

@@ -23,6 +23,29 @@ export function laporanForm(opsi) {
         sisaFoto: opsi.sisaFoto ?? MAKS_FOTO,
         luasSub: opsi.luasSub || {},
         petakSub: opsi.petakSub || {},
+        pintuSub: opsi.pintuSub || {},
+        /** Pintu yang ditampilkan: petak yang dilaporkan + pintu tugas saya (bila tidak ada tugas: semua yang boleh diisi). */
+        get daftarPintu() {
+            const semua = this.pintuSub[this.f.sub_daerah_irigasi_id] || [];
+            const ada = semua.some((p) => p.saya);
+            const isi = (id) => { const v = this.f.baca?.[id]; return !!v && (v.debit !== '' || v.tma !== ''); };
+            return semua.filter((p) => !ada || p.saya || String(p.id) === String(this.f.pintu_air_id) || isi(p.id))
+                .sort((a, b) => (String(b.id) === String(this.f.pintu_air_id)) - (String(a.id) === String(this.f.pintu_air_id)));
+        },
+        nilaiPintu(id) {
+            return this.f.baca[id] || { debit: '', tma: '' };
+        },
+        statusPintu(p, k) {
+            const v = this.nilaiPintu(p.id)[k];
+            if (v === '' || v === null || isNaN(+v)) return null;
+            const [min, maks] = k === 'debit' ? [p.dmin, p.dmaks] : [p.tmin, p.tmaks];
+            if (min === null && maks === null) return null;
+            if (min !== null && +v < min) return 'bawah';
+            if (maks !== null && +v > maks) return 'atas';
+            return 'normal';
+        },
+        teksPintu(s) { return { bawah: '▼ di bawah normal', atas: '▲ di atas normal', normal: '✓ normal' }[s] || ''; },
+        warnaPintu(s) { return { bawah: 'text-[#8A3510]', atas: 'text-[#1B4F7A]', normal: 'text-[#2F5A19]' }[s] || ''; },
         get daftarPetak() { return this.petakSub[this.f.sub_daerah_irigasi_id]?.daftar || []; },
         get petakWajib() { return !!this.petakSub[this.f.sub_daerah_irigasi_id]?.wajib; },
         get petakTerpilih() { return this.daftarPetak.find((p) => String(p.id) === String(this.f.pintu_air_id)) || null; },
@@ -80,6 +103,9 @@ export function laporanForm(opsi) {
         },
 
         init() {
+            // siapkan isian debit/TMA untuk semua pintu yang bisa diisi (agar x-model tidak mengubah state saat render)
+            if (!this.f.baca || Array.isArray(this.f.baca)) this.f.baca = {};
+            Object.values(this.pintuSub).flat().forEach((p) => { if (!this.f.baca[p.id]) this.f.baca[p.id] = { debit: '', tma: '' }; });
             // komoditas aktif = yang luasnya terisi; laporan baru tanpa angka → padi
             ['padi', 'palawija', 'horti'].forEach((k) => { this.pakai[k] = (+this.f[`luas_${k}_ha`] || 0) > 0; });
             if (!this.pakai.palawija && !this.pakai.horti && !this.pakai.padi && (this.baru || +this.f.luas_tanam_ha > 0)) this.pakai.padi = true;

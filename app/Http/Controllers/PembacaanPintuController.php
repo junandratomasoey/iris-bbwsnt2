@@ -190,7 +190,7 @@ class PembacaanPintuController extends Controller
         $data = $request->validate([
             'tanggal' => ['required', 'date', 'before_or_equal:today', 'after_or_equal:'.today()->subDays(30)->toDateString()],
             'jam' => ['nullable', 'date_format:H:i'],
-            'jenis' => ['required', Rule::in(array_keys(SesiPintu::JENIS))],
+            'jenis' => ['required', Rule::in(array_keys($sesi?->jenis === 'harian' ? SesiPintu::JENIS : SesiPintu::jenisPilihan()))],
             'catatan' => [Rule::requiredIf(fn () => $request->input('jenis') === 'lainnya'), 'nullable', 'string', 'max:2000'],
             'baca' => ['nullable', 'array'],
             'baca.*.debit' => ['nullable', 'numeric', 'min:0', 'max:1000000'],
@@ -282,6 +282,10 @@ class PembacaanPintuController extends Controller
     /** Pengisi sendiri selama belum lewat batas ubah, atau pengelola pintu D.I. tersebut. */
     private function bolehUbah(User $u, SesiPintu $sesi): bool
     {
+        if ($sesi->laporan_harian_id) {
+            return false; // diubah lewat laporan harian tanaman-nya
+        }
+
         return $u->bolehKelolaPintu($sesi->daerah_irigasi_id)
             || ($sesi->user_id === $u->id && $u->boleh('isi-pintu') && ! $sesi->terkunci());
     }

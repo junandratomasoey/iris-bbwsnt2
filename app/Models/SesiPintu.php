@@ -18,6 +18,7 @@ class SesiPintu extends Model
 
     public const JENIS = [
         'rutin' => 'Rutin mingguan (Senin)',
+        'harian' => 'Laporan harian PPA',
         'panen' => 'Panen',
         'pekerjaan' => 'Pekerjaan di sawah/saluran',
         'kejadian' => 'Kejadian khusus (kekeringan, banjir, kerusakan)',
@@ -32,7 +33,13 @@ class SesiPintu extends Model
 
     public const MAKS_FOTO = 6;
 
-    protected $fillable = ['daerah_irigasi_id', 'user_id', 'tanggal', 'jam', 'jenis', 'catatan', 'lat', 'lng'];
+    /** Alasan yang bisa dipilih di form pembacaan pintu ('harian' otomatis dari laporan harian PPA). */
+    public static function jenisPilihan(): array
+    {
+        return array_diff_key(self::JENIS, ['harian' => true]);
+    }
+
+    protected $fillable = ['daerah_irigasi_id', 'user_id', 'laporan_harian_id', 'tanggal', 'jam', 'jenis', 'catatan', 'lat', 'lng'];
 
     protected $casts = ['tanggal' => Tanggal::class, 'lat' => 'float', 'lng' => 'float'];
 

@@ -58,8 +58,10 @@ class LaporanHarianController extends Controller
 
         $laporan->pintu_air_id = $request->integer('petak') ?: null;
         $petak = $this->petakPilihan($request->user(), $subs);
+        $pintu = $this->pintuPilihan($request->user(), $subs);
+        $bacaAwal = [];
 
-        return view('laporan.form', compact('laporan', 'subs', 'sebelumnya', 'petak'));
+        return view('laporan.form', compact('laporan', 'subs', 'sebelumnya', 'petak', 'pintu', 'bacaAwal'));
     }
 
     public function store(Request $request)
@@ -70,7 +72,10 @@ class LaporanHarianController extends Controller
 
         $data['user_id'] = $request->user()->id;
         $data['mt'] = $this->mt($data);
+        $baca = $data['baca'];
+        unset($data['baca']);
         $laporan = LaporanHarian::create($data);
+        $this->simpanPintu($laporan, $baca);
         $this->foto->simpan($laporan, $request->file('foto', []), 'laporan', $laporan->lat, $laporan->lng);
 
         return redirect()->route('laporan.show', $laporan)->with('ok', 'Laporan '.$laporan->tanggal->translatedFormat('d M Y').' terkirim.')->with('hapus_draft', true);
@@ -79,7 +84,7 @@ class LaporanHarianController extends Controller
     public function show(LaporanHarian $laporan)
     {
         $this->authorize('view', $laporan);
-        $laporan->load('subDaerahIrigasi.daerahIrigasi.kabupaten', 'user', 'verifikator', 'foto', 'petak');
+        $laporan->load('subDaerahIrigasi.daerahIrigasi.kabupaten', 'user', 'verifikator', 'foto', 'petak', 'sesiPintu.pembacaan.pintu');
         $riwayat = LaporanHarian::where('sub_daerah_irigasi_id', $laporan->sub_daerah_irigasi_id)->where('petak_kunci', $laporan->petak_kunci)
             ->where('tanggal', '<=', $laporan->tanggal)->latest('tanggal')->limit(14)->get()->reverse()->values();
 
@@ -93,8 +98,11 @@ class LaporanHarianController extends Controller
         $subs = $this->subPelaporan($request)->push($laporan->subDaerahIrigasi)->unique('id');
         $sebelumnya = null;
         $petak = $this->petakPilihan($request->user(), $subs, $laporan);
+        $laporan->load('sesiPintu.pembacaan');
+        $bacaAwal = $laporan->sesiPintu?->pembacaan->mapWithKeys(fn ($b) => [$b->pintu_air_id => ['debit' => $b->debit_lps, 'tma' => $b->tma_cm]])->all() ?? [];
+        $pintu = $this->pintuPilihan($request->user(), $subs, array_keys($bacaAwal));
 
-        return view('laporan.form', compact('laporan', 'subs', 'sebelumnya', 'petak'));
+        return view('laporan.form', compact('laporan', 'subs', 'sebelumnya', 'petak', 'pintu', 'bacaAwal'));
     }
 
     public function update(Request $request, LaporanHarian $laporan)
@@ -108,7 +116,10 @@ class LaporanHarianController extends Controller
         if ($laporan->status_verifikasi === 'perbaikan' && $laporan->user_id === $request->user()->id) {
             $data['status_verifikasi'] = 'menunggu';
         }
+        $baca = $data['baca'];
+        unset($data['baca']);
         $laporan->update($data);
+        $this->simpanPintu($laporan, $baca);
         $sisa = 5 - $laporan->foto()->count();
         $this->foto->simpan($laporan, array_slice($request->file('foto', []), 0, max(0, $sisa)), 'laporan', $laporan->lat, $laporan->lng);
 
@@ -118,6 +129,7 @@ class LaporanHarianController extends Controller
     public function destroy(LaporanHarian $laporan)
     {
         $this->authorize('delete', $laporan);
+        $laporan->sesiPintu()->get()->each->delete();
         $laporan->foto->each->delete();
         $laporan->delete();
 
@@ -262,6 +274,9 @@ class LaporanHarianController extends Controller
                     ->where('petak_kunci', $petakKunci))->ignore($laporan?->id),
             ],
             'pintu_air_id' => [Rule::requiredIf($wajibPetak), 'nullable', 'integer', Rule::in($idPetak)],
+            'baca' => ['nullable', 'array'],
+            'baca.*.debit' => ['nullable', 'numeric', 'min:0', 'max:1000000'],
+            'baca.*.tma' => ['nullable', 'numeric', 'min:0', 'max:10000'],
             'fase_tanaman' => ['nullable', Rule::in(array_keys(LaporanHarian::FASE))],
             'luas_tanam_ha' => ['required', 'numeric', 'min:0', 'max:20000'],
             'luas_padi_ha' => ['nullable', 'numeric', 'min:0', 'max:20000'],
@@ -282,6 +297,8 @@ class LaporanHarianController extends Controller
             'sub_daerah_irigasi_id.unique' => $petakKunci ? 'Petak ini sudah punya laporan pada tanggal tersebut. Buka laporan itu untuk mengubahnya.' : 'Sub-D.I. ini sudah punya laporan pada tanggal tersebut. Buka laporan itu untuk mengubahnya.',
             'pintu_air_id.required' => $idPetak ? 'Pilih petak tersier yang Anda laporkan.' : 'Anda belum ditugaskan ke petak tersier di Sub-D.I. ini. Minta Manager mengatur penugasan pintu air.',
             'pintu_air_id.in' => 'Petak tersier ini bukan tugas Anda atau bukan bagian Sub-D.I. yang dipilih.',
+            'baca.*.debit.numeric' => 'Debit pintu harus angka.',
+            'baca.*.tma.numeric' => 'TMA pintu harus angka (cm, dari mistar).',
             'tanggal.after_or_equal' => 'Laporan hanya bisa diisi untuk 7 hari terakhir.',
             'lte' => ':attribute tidak boleh lebih besar dari luas tanam.',
             'lat.between' => 'Lintang harus antara -12 dan -7 (wilayah NTT). Periksa koordinat.',
@@ -297,12 +314,94 @@ class LaporanHarianController extends Controller
         ]);
 
         $data['pintu_air_id'] = $data['pintu_air_id'] ?? null;
+        $data['baca'] = $this->validasiPintu($request, (int) $data['sub_daerah_irigasi_id'], $data['pintu_air_id'], $laporan);
         $luasPetak = $data['pintu_air_id'] ? collect($pilihan['daftar'])->firstWhere('id', (int) $data['pintu_air_id'])['luas'] ?? null : null;
         if ($luasPetak && (float) $data['luas_tanam_ha'] > $luasPetak * 1.05) {
             throw \Illuminate\Validation\ValidationException::withMessages(['luas_padi_ha' => 'Luas tanam melebihi luas layanan petak ('.angka_r($luasPetak).' Ha). Periksa kembali, atau minta Manager memperbarui luas layanan petak.']);
         }
 
         return $data;
+    }
+
+    /**
+     * Pintu air yang bisa diisi debit & TMA-nya di laporan harian, per Sub-D.I.:
+     * pintu dalam Sub-D.I. yang boleh diisi user (tugasnya, atau belum ditugaskan). Tugas sendiri ditampilkan lebih dulu.
+     */
+    private function pintuPilihan(\App\Models\User $u, $subs, array $tambahanId = []): array
+    {
+        if (! $u->boleh('isi-pintu')) {
+            return [];
+        }
+        $daftar = app(\App\Services\PintuService::class)->bolehIsi($u)
+            ->whereIn('sub_daerah_irigasi_id', collect($subs)->pluck('id'))
+            ->where(fn ($q) => $q->where('aktif', true)->orWhereIn('id', $tambahanId))
+            ->with('petugas:id', 'pembacaanTerakhir')->urut()->get();
+
+        return $daftar->groupBy('sub_daerah_irigasi_id')->map(fn ($g) => $g->map(fn (PintuAir $p) => [
+            'id' => $p->id, 'kode' => $p->kode, 'nama' => $p->nama, 'tingkat' => $p->tingkat, 'tingkat_label' => $p->tingkat_label,
+            'dmin' => $p->debit_min_lps, 'dmaks' => $p->debit_maks_lps, 'tmin' => $p->tma_min_cm, 'tmaks' => $p->tma_maks_cm,
+            'rencana' => $p->debit_rencana_lps, 'saya' => $p->petugas->contains('id', $u->id),
+            'terakhir' => $p->pembacaanTerakhir ? $p->pembacaanTerakhir->tanggal->translatedFormat('d M').': '.angka_r($p->pembacaanTerakhir->debit_lps).' L/dt · '.angka_r($p->pembacaanTerakhir->tma_cm).' cm' : null,
+        ])->values()->all())->all();
+    }
+
+    /**
+     * Debit & TMA pintu yang diisi di laporan: hanya pintu yang boleh diisi user di Sub-D.I. ini.
+     * Pintu petak yang dilaporkan wajib diisi debit dan TMA-nya.
+     *
+     * @return array<int, array{debit: ?float, tma: ?float}>
+     */
+    private function validasiPintu(Request $request, int $subId, ?int $petakId, ?LaporanHarian $laporan): array
+    {
+        $u = $request->user();
+        $lama = $laporan?->sesiPintu?->pembacaan()->pluck('pintu_air_id')->all() ?? [];
+        $boleh = collect($this->pintuPilihan($u, SubDaerahIrigasi::whereKey($subId)->get(), $lama)[$subId] ?? [])->pluck('id')->all();
+        $angka = fn ($v) => $v === null || $v === '' ? null : (float) $v;
+        $hasil = [];
+        foreach ((array) $request->input('baca', []) as $id => $r) {
+            $debit = $angka($r['debit'] ?? null);
+            $tma = $angka($r['tma'] ?? null);
+            if ($debit === null && $tma === null) {
+                continue;
+            }
+            if (! in_array((int) $id, $boleh, true)) {
+                continue; // pintu Sub-D.I. lain (mis. setelah ganti pilihan) diabaikan
+            }
+            $hasil[(int) $id] = ['debit' => $debit, 'tma' => $tma];
+        }
+        if ($petakId && in_array($petakId, $boleh, true)) {
+            $p = $hasil[$petakId] ?? ['debit' => null, 'tma' => null];
+            $galat = [];
+            if ($p['debit'] === null) {
+                $galat["baca.$petakId.debit"] = 'Isi debit pintu petak ini (L/dt).';
+            }
+            if ($p['tma'] === null) {
+                $galat["baca.$petakId.tma"] = 'Isi TMA pintu petak ini (cm, baca di mistar).';
+            }
+            if ($galat) {
+                throw \Illuminate\Validation\ValidationException::withMessages($galat);
+            }
+        }
+
+        return $hasil;
+    }
+
+    /** Simpan debit & TMA pintu sebagai pembacaan pintu (jenis "harian") yang terhubung ke laporan ini. */
+    private function simpanPintu(LaporanHarian $l, array $baca): void
+    {
+        $sesi = $l->sesiPintu()->first();
+        if (! $baca) {
+            $sesi?->delete();
+
+            return;
+        }
+        $diId = SubDaerahIrigasi::whereKey($l->sub_daerah_irigasi_id)->value('daerah_irigasi_id');
+        $sesi ??= new \App\Models\SesiPintu(['laporan_harian_id' => $l->id, 'user_id' => $l->user_id, 'jenis' => 'harian', 'jam' => now()->format('H:i')]);
+        $sesi->fill(['daerah_irigasi_id' => $diId, 'tanggal' => $l->tanggal, 'lat' => $l->lat, 'lng' => $l->lng])->save();
+        $sesi->pembacaan()->delete();
+        foreach ($baca as $id => $r) {
+            $sesi->pembacaan()->create(['pintu_air_id' => $id, 'tanggal' => $l->tanggal, 'debit_lps' => $r['debit'], 'tma_cm' => $r['tma']]);
+        }
     }
 
     /**

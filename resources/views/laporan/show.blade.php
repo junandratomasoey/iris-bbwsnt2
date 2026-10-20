@@ -46,6 +46,24 @@
                 <div class="mt-4 rounded-md bg-savana px-4 py-3 text-sm"><p class="font-semibold">Kendala</p><p class="whitespace-pre-line">{{ $laporan->kendala }}</p></div>
             @endif
         </section>
+        @if($laporan->sesiPintu && $laporan->sesiPintu->pembacaan->isNotEmpty())
+            <section class="panel overflow-x-auto p-5">
+                <h2 class="text-lg font-semibold">Debit &amp; TMA pintu air</h2>
+                <table class="table-base mt-2">
+                    <thead><tr><th>Pintu</th><th class="text-right">Debit (L/dt)</th><th class="text-right">TMA mistar (cm)</th><th class="text-right">Q rencana</th></tr></thead>
+                    <tbody>
+                    @foreach($laporan->sesiPintu->pembacaan->sortBy(fn ($b) => [\App\Models\PintuAir::URUTAN_TINGKAT[$b->pintu->tingkat] ?? 9, $b->pintu->kode]) as $b)
+                        <tr>
+                            <td><a href="{{ route('pintu.show', $b->pintu) }}" class="font-semibold text-saluran-600">{{ $b->pintu->kode }}</a><span class="block text-xs text-basalt-soft">{{ $b->pintu->tingkat_label }}</span></td>
+                            <td class="whitespace-nowrap text-right">{{ angka_r($b->debit_lps) }} <x-status-pintu :s="$b->pintu->statusDebit($b->debit_lps)"/></td>
+                            <td class="whitespace-nowrap text-right">{{ angka_r($b->tma_cm) }} <x-status-pintu :s="$b->pintu->statusTma($b->tma_cm)"/></td>
+                            <td class="text-right text-xs">{{ $b->pintu->debit_rencana_lps ? angka_r($b->pintu->debit_rencana_lps).' L/dt' : '–' }}</td>
+                        </tr>
+                    @endforeach
+                    </tbody>
+                </table>
+            </section>
+        @endif
 
         @if($laporan->foto->isNotEmpty())
             <section class="panel p-5">

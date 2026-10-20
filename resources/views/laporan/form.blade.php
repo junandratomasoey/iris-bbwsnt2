@@ -5,6 +5,7 @@
         'tanggal' => old('tanggal', optional($laporan->tanggal)->toDateString() ?? today()->toDateString()),
         'sub_daerah_irigasi_id' => (string) old('sub_daerah_irigasi_id', $laporan->sub_daerah_irigasi_id),
         'pintu_air_id' => (string) old('pintu_air_id', $laporan->pintu_air_id),
+        'baca' => (object) collect(old('baca', $bacaAwal))->map(fn ($r) => ['debit' => $r['debit'] ?? '', 'tma' => $r['tma'] ?? ''])->all(),
         'debit_intake_lps' => old('debit_intake_lps', $laporan->debit_intake_lps),
         'tma_cm' => old('tma_cm', $laporan->tma_cm),
         'kondisi_saluran' => old('kondisi_saluran', $laporan->kondisi_saluran),
@@ -42,7 +43,7 @@
 
 <form method="POST" enctype="multipart/form-data"
       action="{{ $baru ? route('laporan.store') : route('laporan.update', $laporan) }}"
-      x-data="laporanForm({ baru: {{ $baru ? 'true' : 'false' }}, awal: @js($awal), sisaFoto: {{ $sisaFoto }}, luasSub: @js($luasSub), titikSub: @js($titikSub), petakSub: @js($petak) })"
+      x-data="laporanForm({ baru: {{ $baru ? 'true' : 'false' }}, awal: @js($awal), sisaFoto: {{ $sisaFoto }}, luasSub: @js($luasSub), titikSub: @js($titikSub), petakSub: @js($petak), pintuSub: @js((object) $pintu) })"
       @submit="kirimForm" class="space-y-5">
     @csrf @if(! $baru) @method('PUT') @endif
 
@@ -157,6 +158,31 @@
                 <span x-show="statusPratinjau === '{{ $k }}'"><x-status :s="$k"/></span>
             @endforeach
         </div>
+    </fieldset>
+
+    <fieldset class="panel space-y-3 p-4 sm:p-5" x-show="daftarPintu.length" x-cloak>
+        <legend class="float-left mb-1 font-gauge text-lg font-semibold">Debit &amp; TMA pintu air</legend>
+        <p class="clear-left text-xs text-basalt-soft">Baca mistar di setiap pintu tugas Anda. Debit dalam L/detik, TMA dalam cm. Pintu petak yang dilaporkan wajib diisi; pintu lain isi bila dikunjungi hari ini.</p>
+        @if($errors->has('baca.*'))<p class="rounded-md bg-[#F6D9D7] px-3 py-2 text-sm font-medium text-[#7E1A14]">{{ collect($errors->get('baca.*'))->flatten()->first() }}</p>@endif
+        <template x-for="p in daftarPintu" :key="p.id">
+            <div class="rounded-md border border-savana-line p-3" :class="String(p.id) === String(f.pintu_air_id) && 'border-saluran-500 bg-saluran-50/40'">
+                <div class="flex flex-wrap items-baseline justify-between gap-x-2">
+                    <p class="font-semibold"><span x-text="p.kode"></span>
+                        <span x-show="String(p.id) === String(f.pintu_air_id)" class="ml-1 rounded bg-saluran-600 px-1.5 text-[10px] font-semibold text-white">petak dilaporkan</span>
+                        <span x-show="p.saya && String(p.id) !== String(f.pintu_air_id)" class="ml-1 rounded bg-[#E4F0DD] px-1.5 text-[10px] font-semibold text-[#2F5A19]">tugas saya</span></p>
+                    <span class="text-xs text-basalt-soft" x-text="p.tingkat_label + (p.nama ? ' · ' + p.nama : '')"></span>
+                </div>
+                <p class="text-[11px] text-basalt-mute" x-text="[p.terakhir ? 'Terakhir ' + p.terakhir : null, p.rencana ? 'Q rencana ' + p.rencana + ' L/dt' : null].filter(Boolean).join(' · ')"></p>
+                <div class="mt-2 grid grid-cols-2 gap-3">
+                    <label><span class="label">Debit (L/dt)<span x-show="String(p.id) === String(f.pintu_air_id)" class="text-status-kritis"> *</span></span>
+                        <input type="number" step="any" min="0" inputmode="decimal" :name="`baca[${p.id}][debit]`" x-model="nilaiPintu(p.id).debit" :required="String(p.id) === String(f.pintu_air_id)" class="input py-2.5 tabular-nums">
+                        <span class="mt-1 block h-4 text-xs font-semibold" :class="warnaPintu(statusPintu(p, 'debit'))" x-text="teksPintu(statusPintu(p, 'debit'))"></span></label>
+                    <label><span class="label">TMA mistar (cm)<span x-show="String(p.id) === String(f.pintu_air_id)" class="text-status-kritis"> *</span></span>
+                        <input type="number" step="any" min="0" inputmode="decimal" :name="`baca[${p.id}][tma]`" x-model="nilaiPintu(p.id).tma" :required="String(p.id) === String(f.pintu_air_id)" class="input py-2.5 tabular-nums">
+                        <span class="mt-1 block h-4 text-xs font-semibold" :class="warnaPintu(statusPintu(p, 'tma'))" x-text="teksPintu(statusPintu(p, 'tma'))"></span></label>
+                </div>
+            </div>
+        </template>
     </fieldset>
 
     <fieldset class="panel space-y-4 p-4 sm:p-5">
