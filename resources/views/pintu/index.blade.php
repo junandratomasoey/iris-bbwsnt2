@@ -141,9 +141,9 @@
                                 <td class="min-w-[11rem]">
                                     <a href="{{ route('pintu.show', $p) }}" class="font-semibold text-saluran-600">{{ $p->kode }}</a>
                                     <span class="block text-xs text-basalt-soft">{{ $p->tingkat_label }}{{ $p->hulu ? ' · dari '.$p->hulu->kode : '' }}{{ $p->nama ? ' · '.$p->nama : '' }}</span>
-                                    <span class="block text-[11px] text-basalt-mute">@if($p->petugas->isNotEmpty())<x-ikon n="petugas" class="inline h-3 w-3"/> {{ $p->petugas->pluck('name')->implode(', ') }}@else<span class="text-[#8A3510]">Belum ditugaskan</span>@endif · @if($p->lat)<x-ikon n="lokasi" class="inline h-3 w-3"/> titik ada@else<span class="text-[#8A3510]">titik belum</span>@endif</span>
+                                    <span class="block text-[11px] text-basalt-mute">@if($p->petugas->isNotEmpty())<x-ikon n="petugas" class="inline h-3 w-3"/> {{ $p->petugas->pluck('name')->implode(', ') }}@else<span class="text-[#8A3510]">Belum ditugaskan</span>@endif · @if($p->lat)<x-ikon n="lokasi" class="inline h-3 w-3"/> titik ada @else<span class="text-[#8A3510]">titik belum</span>@endif</span>
                                 </td>
-                                <td class="whitespace-nowrap text-right">{{ $p->luas_layanan_ha ? angka_r($p->luas_layanan_ha).' Ha' : '–' }}</td>
+                                <td class="whitespace-nowrap text-right">{{ $p->luas_layanan_ha ? angka_r($p->luas_layanan_ha).' Ha' : '–' }}@if($p->debit_rencana_lps)<span class="block text-[11px] text-basalt-mute">Q rencana {{ angka_r($p->debit_rencana_lps) }} L/dt</span>@endif</td>
                                 <td class="whitespace-nowrap">
                                     @if($t?->debit_lps !== null)<span class="font-semibold">{{ angka_r($t->debit_lps) }}</span> <span class="text-xs">L/dt</span> <x-status-pintu :s="$p->status_debit"/>@else<span class="text-basalt-mute">–</span>@endif
                                     <span class="block text-[11px] text-basalt-mute">normal {{ PintuAir::rentangTeks($p->debit_min_lps, $p->debit_maks_lps, 'L/dt') }}</span>

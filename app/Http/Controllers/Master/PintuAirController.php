@@ -277,6 +277,7 @@ class PintuAirController extends Controller
             'sub_daerah_irigasi_id' => ['nullable', Rule::exists('sub_daerah_irigasi', 'id')->where('daerah_irigasi_id', $di->id)],
             'saluran' => ['nullable', 'string', 'max:255'],
             'luas_layanan_ha' => $angka(100000),
+            'debit_rencana_lps' => $angka(1000000),
             'debit_min_lps' => $angka(1000000),
             'debit_maks_lps' => [...$angka(1000000), $this->tidakDiBawah('debit_min_lps')],
             'tma_min_cm' => $angka(10000),
@@ -308,14 +309,14 @@ class PintuAirController extends Controller
     private function rapikan(array $r): array
     {
         $r['kode'] = trim($r['kode']);
-        foreach (['luas_layanan_ha', 'debit_min_lps', 'debit_maks_lps', 'tma_min_cm', 'tma_maks_cm', 'hulu_id', 'sub_daerah_irigasi_id', 'bangunan_id', 'lat', 'lng'] as $k) {
+        foreach (['luas_layanan_ha', 'debit_rencana_lps', 'debit_min_lps', 'debit_maks_lps', 'tma_min_cm', 'tma_maks_cm', 'hulu_id', 'sub_daerah_irigasi_id', 'bangunan_id', 'lat', 'lng'] as $k) {
             if (array_key_exists($k, $r) && $r[$k] === '') {
                 $r[$k] = null;
             }
         }
 
         return collect($r)->only([
-            'kode', 'nama', 'jenis', 'tingkat', 'hulu_id', 'sub_daerah_irigasi_id', 'saluran', 'luas_layanan_ha', 'debit_min_lps', 'debit_maks_lps',
+            'kode', 'nama', 'jenis', 'tingkat', 'hulu_id', 'sub_daerah_irigasi_id', 'saluran', 'luas_layanan_ha', 'debit_rencana_lps', 'debit_min_lps', 'debit_maks_lps',
             'tma_min_cm', 'tma_maks_cm', 'bangunan_id', 'lat', 'lng', 'keterangan',
         ])->all();
     }

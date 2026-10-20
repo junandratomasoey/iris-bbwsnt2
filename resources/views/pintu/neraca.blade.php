@@ -63,7 +63,7 @@
         <p class="px-4 pt-3 text-sm">Rata-rata D.I.: <b>{{ $n['rata_per_ha'] !== null ? angka_r($n['rata_per_ha']).' L/dt/Ha' : '–' }}</b> (jumlah debit petak terbaca ÷ jumlah luas layanannya). Diurutkan dari yang menerima paling sedikit.</p>
         <div class="overflow-x-auto">
             <table class="table-base mt-2">
-                <thead><tr><th>Petak / pintu tersier</th><th class="text-right">Luas layanan</th><th class="text-right">Debit</th><th class="text-right">L/dt/Ha</th><th class="min-w-[12rem]">Dibanding rata-rata D.I.</th><th>Kondisi tanaman (laporan PPA)</th></tr></thead>
+                <thead><tr><th>Petak / pintu tersier</th><th class="text-right">Luas layanan</th><th class="text-right">Debit</th><th class="text-right">Dibanding rencana</th><th class="text-right">L/dt/Ha</th><th class="min-w-[12rem]">Dibanding rata-rata D.I.</th><th>Kondisi tanaman (laporan PPA)</th></tr></thead>
                 <tbody>
                 @foreach($n['merata'] as $r)
                     @php $p = $r['pintu']; $l = $r['laporan']; @endphp
@@ -72,6 +72,7 @@
                             <span class="block text-xs text-basalt-soft">{{ $p->subDaerahIrigasi?->nama }}{{ $p->petugas->isNotEmpty() ? ' · '.$p->petugas->pluck('name')->implode(', ') : '' }}</span></td>
                         <td class="whitespace-nowrap text-right">{{ $r['luas'] ? angka_r($r['luas']).' Ha' : '–' }}</td>
                         <td class="whitespace-nowrap text-right">{{ $r['debit'] !== null ? angka_r($r['debit']).' L/dt' : '–' }} <x-status-pintu :s="$r['status_debit']"/></td>
+                        <td class="whitespace-nowrap text-right">@if($r['persen_rencana'] !== null)<span class="font-semibold">{{ $r['persen_rencana'] }}%</span><span class="block text-[11px] text-basalt-mute">rencana {{ angka_r($r['rencana']) }} L/dt</span>@elseif($r['rencana'])<span class="text-xs text-basalt-mute">rencana {{ angka_r($r['rencana']) }} L/dt</span>@else – @endif</td>
                         <td class="text-right font-semibold">{{ $r['per_ha'] !== null ? angka_r($r['per_ha']) : '–' }}</td>
                         <td>
                             @if($r['rasio'] !== null)

@@ -163,6 +163,8 @@ class PintuService
             return [
                 'pintu' => $p, 'debit' => $d, 'tanggal' => $baca->get($p->id)?->tanggal, 'luas' => $p->luas_layanan_ha,
                 'per_ha' => $q !== null ? round($q, 3) : null,
+                'rencana' => $p->debit_rencana_lps,
+                'persen_rencana' => $d !== null && $p->debit_rencana_lps > 0 ? (int) round($d / $p->debit_rencana_lps * 100) : null,
                 'rasio' => $q !== null && $rata ? (int) round($q / $rata * 100) : null,
                 'status_debit' => $p->statusDebit($d),
                 'laporan' => $l, 'status_lahan' => $l ? StatusKondisi::dariLaporan($l) : null,

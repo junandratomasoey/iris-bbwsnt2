@@ -44,12 +44,12 @@ class PintuAir extends Model
     public const PERAN = ['utama' => 'Penanggung jawab', 'pengganti' => 'Pengganti'];
 
     protected $fillable = [
-        'daerah_irigasi_id', 'sub_daerah_irigasi_id', 'bangunan_id', 'kode', 'nama', 'jenis', 'tingkat', 'hulu_id', 'saluran', 'luas_layanan_ha',
+        'daerah_irigasi_id', 'sub_daerah_irigasi_id', 'bangunan_id', 'kode', 'nama', 'jenis', 'tingkat', 'hulu_id', 'saluran', 'luas_layanan_ha', 'debit_rencana_lps',
         'debit_min_lps', 'debit_maks_lps', 'tma_min_cm', 'tma_maks_cm', 'urutan', 'aktif', 'lat', 'lng', 'titik_oleh', 'titik_pada', 'titik_akurasi_m', 'keterangan',
     ];
 
     protected $casts = [
-        'aktif' => 'boolean', 'lat' => 'float', 'lng' => 'float', 'luas_layanan_ha' => 'float',
+        'aktif' => 'boolean', 'lat' => 'float', 'lng' => 'float', 'luas_layanan_ha' => 'float', 'debit_rencana_lps' => 'float',
         'debit_min_lps' => 'float', 'debit_maks_lps' => 'float', 'tma_min_cm' => 'float', 'tma_maks_cm' => 'float',
         'titik_pada' => 'datetime',
     ];

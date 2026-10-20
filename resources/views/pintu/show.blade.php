@@ -16,6 +16,7 @@
             @if($p->saluran)<dt class="text-basalt-soft">Saluran</dt><dd>{{ $p->saluran }}</dd>@endif
             @if($p->bangunan)<dt class="text-basalt-soft">Bangunan</dt><dd>{{ $p->bangunan->nama }}</dd>@endif
             <dt class="text-basalt-soft">Luas layanan</dt><dd>{{ $p->luas_layanan_ha ? angka_r($p->luas_layanan_ha).' Ha' : '–' }}</dd>
+            <dt class="text-basalt-soft">Debit rencana</dt><dd>{{ $p->debit_rencana_lps ? angka_r($p->debit_rencana_lps).' L/dt' : '–' }}</dd>
             <dt class="text-basalt-soft">Debit normal</dt><dd>{{ PintuAir::rentangTeks($p->debit_min_lps, $p->debit_maks_lps, 'L/dt') }}</dd>
             <dt class="text-basalt-soft">TMA normal</dt><dd>{{ PintuAir::rentangTeks($p->tma_min_cm, $p->tma_maks_cm, 'cm') }}</dd>
             @if($p->lat)<dt class="text-basalt-soft">Titik</dt><dd><a href="https://www.google.com/maps?q={{ $p->lat }},{{ $p->lng }}" target="_blank" rel="noopener" class="text-saluran-600">{{ number_format($p->lat, 5) }}, {{ number_format($p->lng, 5) }}</a></dd>@endif

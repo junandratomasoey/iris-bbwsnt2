@@ -12,6 +12,7 @@ class DatabaseSeeder extends Seeder
             WilayahSatgasSeeder::class,
             MasterIrigasiSeeder::class,
             InfrastrukturSigaSeeder::class,
+            SkemaPintuSeeder::class,
             PetaDiSeeder::class,
             PenggunaSeeder::class,
             KejadianSeeder::class,

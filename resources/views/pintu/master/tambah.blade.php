@@ -3,10 +3,10 @@
 <x-judul judul="Tambah pintu air" sub="D.I. {{ $di->nama }} — isi beberapa pintu sekaligus. Baris tanpa kode diabaikan."/>
 
 @php
-    $awal = old('pintu', [['kode' => '', 'nama' => '', 'jenis' => 'sadap', 'tingkat' => 'tersier', 'hulu_id' => '', 'sub_daerah_irigasi_id' => '', 'saluran' => '', 'luas_layanan_ha' => '', 'debit_min_lps' => '', 'debit_maks_lps' => '', 'tma_min_cm' => '', 'tma_maks_cm' => '']]);
+    $awal = old('pintu', [['kode' => '', 'nama' => '', 'jenis' => 'sadap', 'tingkat' => 'tersier', 'hulu_id' => '', 'sub_daerah_irigasi_id' => '', 'saluran' => '', 'luas_layanan_ha' => '', 'debit_rencana_lps' => '', 'debit_min_lps' => '', 'debit_maks_lps' => '', 'tma_min_cm' => '', 'tma_maks_cm' => '']]);
 @endphp
 <form method="POST" action="{{ route('master.pintu-air.store') }}" x-data="{ baris: @js(array_values($awal)), kirim: false,
-        tambah() { const b = this.baris[this.baris.length - 1] || {}; this.baris.push({ kode: '', nama: '', jenis: b.jenis || 'sadap', tingkat: b.tingkat || 'tersier', hulu_id: b.hulu_id || '', sub_daerah_irigasi_id: b.sub_daerah_irigasi_id || '', saluran: b.saluran || '', luas_layanan_ha: '', debit_min_lps: '', debit_maks_lps: '', tma_min_cm: '', tma_maks_cm: '' }); this.$nextTick(() => [...this.$el.querySelectorAll('[data-kode]')].pop()?.focus()) } }"
+        tambah() { const b = this.baris[this.baris.length - 1] || {}; this.baris.push({ kode: '', nama: '', jenis: b.jenis || 'sadap', tingkat: b.tingkat || 'tersier', hulu_id: b.hulu_id || '', sub_daerah_irigasi_id: b.sub_daerah_irigasi_id || '', saluran: b.saluran || '', luas_layanan_ha: '', debit_rencana_lps: '', debit_min_lps: '', debit_maks_lps: '', tma_min_cm: '', tma_maks_cm: '' }); this.$nextTick(() => [...this.$el.querySelectorAll('[data-kode]')].pop()?.focus()) } }"
       @submit="kirim = true">
     @csrf
     <input type="hidden" name="daerah_irigasi_id" value="{{ $di->id }}">
@@ -43,11 +43,13 @@
                     <input class="input" :name="`pintu[${i}][saluran]`" x-model="b.saluran" maxlength="255" placeholder="Saluran sekunder Oesao"></label>
                 <label class="lg:col-span-2"><span class="label">Luas layanan (Ha)</span>
                     <input class="input" type="number" step="any" min="0" inputmode="decimal" :name="`pintu[${i}][luas_layanan_ha]`" x-model="b.luas_layanan_ha"></label>
+                <label class="lg:col-span-2"><span class="label">Debit rencana (L/dt)</span>
+                    <input class="input" type="number" step="any" min="0" inputmode="decimal" :name="`pintu[${i}][debit_rencana_lps]`" x-model="b.debit_rencana_lps"></label>
                 <div class="sm:col-span-2 lg:col-span-4"><span class="label">Debit normal (L/dt)</span>
                     <div class="flex items-center gap-2"><input class="input" type="number" step="any" min="0" inputmode="decimal" :name="`pintu[${i}][debit_min_lps]`" x-model="b.debit_min_lps" placeholder="min" aria-label="Debit minimum"><span>–</span><input class="input" type="number" step="any" min="0" inputmode="decimal" :name="`pintu[${i}][debit_maks_lps]`" x-model="b.debit_maks_lps" placeholder="maks" aria-label="Debit maksimum"></div></div>
                 <div class="sm:col-span-2 lg:col-span-4"><span class="label">TMA normal (cm)</span>
                     <div class="flex items-center gap-2"><input class="input" type="number" step="any" min="0" inputmode="decimal" :name="`pintu[${i}][tma_min_cm]`" x-model="b.tma_min_cm" placeholder="min" aria-label="TMA minimum"><span>–</span><input class="input" type="number" step="any" min="0" inputmode="decimal" :name="`pintu[${i}][tma_maks_cm]`" x-model="b.tma_maks_cm" placeholder="maks" aria-label="TMA maksimum"></div></div>
-                <div class="flex items-end justify-end lg:col-span-8">
+                <div class="flex items-end justify-end lg:col-span-6">
                     <button type="button" class="text-sm font-medium text-status-kritis" x-show="baris.length > 1" @click="baris.splice(i, 1)">Hapus baris</button>
                 </div>
             </fieldset>
