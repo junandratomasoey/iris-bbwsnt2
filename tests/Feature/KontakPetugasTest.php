@@ -55,6 +55,18 @@ class KontakPetugasTest extends TestCase
         $this->petugasB->subDaerahIrigasi()->attach($this->subB);
     }
 
+    public function test_kontak_hanya_di_di_wilayahnya_kecuali_pimpinan_dan_admin(): void
+    {
+        $pimpinan = User::create(['name' => 'Kasatker', 'username' => 'kasatker', 'password' => 'x', 'role' => Role::PIMPINAN, 'must_change_password' => false]);
+        foreach ([$this->admin, $pimpinan] as $u) {
+            $this->actingAs($u)->get(route('petugas.index'))->assertOk()->assertSee('Petugas A')->assertSee('Petugas B');
+        }
+        $this->actingAs($this->manager)->get(route('petugas.index'))->assertOk()
+            ->assertSee('Petugas A')->assertDontSee('Petugas B')->assertSee('di D.I. wilayah Anda (Oesao)');
+        $this->actingAs($this->koordinator)->get(route('petugas.index'))->assertOk()->assertSee('Petugas A')->assertDontSee('Petugas B');   // Satgas II = Kupang
+        $this->actingAs($this->manager)->get(route('petugas.index', ['di' => $this->diB->id]))->assertOk()->assertDontSee('Petugas B');   // filter D.I. lain tidak membuka
+    }
+
     public function test_admin_menambah_petugas_dengan_login_nomor_hp(): void
     {
         $this->actingAs($this->admin)->post(route('petugas.store'), [
@@ -125,6 +137,6 @@ class KontakPetugasTest extends TestCase
         $this->assertTrue($this->petugasA->fresh()->must_change_password);
 
         $this->actingAs($this->koordinator)->get(route('petugas.index'))->assertOk()
-            ->assertSee('Petugas A')->assertSee('Petugas B')->assertSee(route('petugas.edit', $this->petugasA))->assertDontSee(route('petugas.edit', $this->petugasB));
+            ->assertSee('Petugas A')->assertDontSee('Petugas B')->assertSee(route('petugas.edit', $this->petugasA));   // hanya kontak di D.I. wilayah Satgas-nya
     }
 }

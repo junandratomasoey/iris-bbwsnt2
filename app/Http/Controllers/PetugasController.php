@@ -27,8 +27,12 @@ class PetugasController extends Controller
         $kelola = $this->bolehMengelola($u);
         abort_unless($kelola || $u->boleh('lihat-petugas'), 403);
         $status = $kelola ? $request->input('status', 'aktif') : 'aktif';
+        // Super Admin, Pimpinan, Admin OP melihat semua; jabatan lain hanya kontak di D.I. wilayahnya
+        $diIds = $u->isGlobal() ? null : ($u->diIdsTerjangkau() ?? []);
 
         $petugas = User::lapangan()
+            ->when($diIds !== null, fn ($q) => $q->where(fn ($w) => $w->whereIn('daerah_irigasi_id', $diIds)
+                ->orWhereHas('subDaerahIrigasi', fn ($s) => $s->whereIn('daerah_irigasi_id', $diIds))))
             ->with(['daerahIrigasi:id,nama,kabupaten_id', 'daerahIrigasi.kabupaten:id,nama', 'subDaerahIrigasi:id,nama,daerah_irigasi_id'])
             ->when($status === 'aktif', fn ($q) => $q->where('is_active', true))
             ->when($status === 'nonaktif', fn ($q) => $q->where('is_active', false))
@@ -45,7 +49,8 @@ class PetugasController extends Controller
             'kelola' => $kelola,
             'status' => $status,
             'boleh' => fn (User $p) => $this->bolehUbah($u, $p),
-            'diList' => DaerahIrigasi::orderBy('nama')->get(['id', 'nama']),
+            'diList' => DaerahIrigasi::when($diIds !== null, fn ($q) => $q->whereIn('id', $diIds))->orderBy('nama')->get(['id', 'nama']),
+            'semua' => $diIds === null,
             'jabatanList' => User::lapangan()->whereNotNull('jabatan')->distinct()->orderBy('jabatan')->pluck('jabatan'),
         ]);
     }

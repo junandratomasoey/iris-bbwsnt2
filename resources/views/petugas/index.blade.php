@@ -1,5 +1,5 @@
 <x-layouts.app title="Kontak petugas">
-<x-judul judul="Kontak petugas lapangan" :sub="angka($petugas->total()).' kontak'.($status === 'aktif' ? ' aktif' : '')">
+<x-judul judul="Kontak petugas lapangan" :sub="angka($petugas->total()).' kontak'.($status === 'aktif' ? ' aktif' : '').($semua ? '' : ' di D.I. wilayah Anda ('.$diList->pluck('nama')->take(4)->implode(', ').($diList->count() > 4 ? ', …' : '').')')">
     @if($kelola)<a href="{{ route('petugas.create', ['di' => request('di')]) }}" class="btn-primary"><x-ikon n="tambah" class="h-4 w-4"/> Tambah petugas</a>@endif
 </x-judul>
 <form method="GET" class="panel mb-4 grid gap-3 p-4 sm:grid-cols-2 {{ $kelola ? 'lg:grid-cols-5' : 'lg:grid-cols-4' }}">
