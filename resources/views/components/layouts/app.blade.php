@@ -11,7 +11,7 @@
         ['master.daerah-irigasi.index', 'Daerah irigasi', 'di', true],
         ['master.bangunan.index', 'Infrastruktur', 'bangunan', $u->can('lihat-master')],
         ['master.peta.index', 'Peta batas D.I.', 'peta', $u->can('lihat-master')],
-        ['master.jadwal-tanam.index', 'Jadwal tanam', 'jadwal', $u->can('lihat-master')],
+        ['master.jadwal-tanam.index', 'Jadwal tanam', 'jadwal', $u->can('lihat-jadwal')],
         ['master.p3a.index', 'P3A', 'p3a', $u->can('lihat-master')],
         ['pengguna.index', 'Pengguna', 'pengguna', $u->can('kelola-pengguna')],
         ['hak-akses.index', 'Hak akses', 'kunci', $u->can('kelola-hak-akses')],

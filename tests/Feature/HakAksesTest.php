@@ -102,6 +102,22 @@ class HakAksesTest extends TestCase
         $this->actingAs($this->segar($this->pob))->get(route('laporan.create'))->assertOk();
     }
 
+    public function test_menu_infrastruktur_peta_batas_p3a_hanya_pimpinan_dan_admin(): void
+    {
+        $koor = User::create(['name' => 'Koor', 'username' => 'koor', 'password' => 'x', 'role' => Role::KOORDINATOR, 'must_change_password' => false]);
+        $mgr = User::create(['name' => 'Mgr', 'username' => 'mgr', 'password' => 'x', 'role' => Role::MANAGER, 'must_change_password' => false]);
+        foreach (['master.bangunan.index', 'master.peta.index', 'master.p3a.index'] as $r) {
+            foreach ([$this->sa, $this->admin, $this->pimpinan] as $u) {
+                $this->actingAs($u)->get(route($r))->assertOk();
+            }
+            foreach ([$koor, $mgr, $this->petugas, $this->pob] as $u) {
+                $this->actingAs($u)->get(route($r))->assertForbidden();
+            }
+        }
+        $this->actingAs($mgr)->get(route('master.jadwal-tanam.index'))->assertOk();        // jadwal tanam tetap
+        $this->actingAs($mgr)->get(route('laporan.index'))->assertDontSee('Peta batas D.I.')->assertDontSee('>P3A<', false)->assertSee('Jadwal tanam');
+    }
+
     public function test_menu_mengikuti_izin(): void
     {
         $this->actingAs($this->petugas)->get(route('laporan.index'))->assertOk()

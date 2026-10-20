@@ -43,8 +43,13 @@ final class Izin
             'bawaan' => [Role::ADMIN_OP, Role::KOORDINATOR],
         ],
         'lihat-master' => [
-            'grup' => 'master', 'label' => 'Lihat menu data master',
-            'ket' => 'Infrastruktur, peta batas D.I., jadwal tanam, P3A.',
+            'grup' => 'master', 'label' => 'Lihat menu Infrastruktur, Peta batas D.I., P3A',
+            'ket' => 'Daftar infrastruktur, batas D.I. di peta, dan P3A.',
+            'bawaan' => [Role::PIMPINAN, Role::ADMIN_OP],
+        ],
+        'lihat-jadwal' => [
+            'grup' => 'master', 'label' => 'Lihat menu Jadwal tanam',
+            'ket' => 'Jadwal MT per D.I. dari Bidang OP.',
             'bawaan' => [Role::PIMPINAN, Role::ADMIN_OP, Role::KOORDINATOR, Role::MANAGER],
         ],
         'kelola-master' => [

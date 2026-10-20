@@ -14,7 +14,7 @@ class JadwalTanamController extends Controller
 {
     public function index(Request $request)
     {
-        $this->authorize('lihat-master');
+        $this->authorize('lihat-jadwal');
         $tahun = $request->integer('tahun') ?: (int) date('Y');
         $di = DaerahIrigasi::with(['kabupaten:id,nama', 'jadwalTanam' => fn ($q) => $q->where('tahun', $tahun)])->orderBy('kode')->get();
         $tahunList = JadwalTanam::distinct()->orderByDesc('tahun')->pluck('tahun')->push((int) date('Y'))->push((int) date('Y') + 1)->unique()->sortDesc()->values();
