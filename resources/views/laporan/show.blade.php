@@ -1,10 +1,12 @@
 @php
     use App\Models\LaporanHarian as LH;
+    use App\Support\KodeIsian as K;
     $s = $laporan->subDaerahIrigasi;
     $maxTanam = max(1, $riwayat->max('luas_tanam_ha'));
+    $kodePetak = $laporan->petak->pluck('pintu.kode')->filter();
 @endphp
-<x-layouts.app :title="'Laporan '.$s->nama">
-<x-judul :judul="$s->nama.($laporan->petak ? ' · Petak '.$laporan->petak->kode : '')" :sub="'D.I. '.$s->daerahIrigasi->nama.($laporan->petak?->nama ? ' · '.$laporan->petak->nama : '').' · '.$laporan->tanggal->translatedFormat('l, d F Y')">
+<x-layouts.app :title="'Laporan PPA '.$s->nama">
+<x-judul :judul="'Laporan PPA · '.$s->nama" :sub="'D.I. '.$s->daerahIrigasi->nama.' · '.$laporan->tanggal->translatedFormat('l, d F Y').($laporan->jam ? ' · pukul '.substr($laporan->jam, 0, 5) : '').($kodePetak->isNotEmpty() ? ' · '.$kodePetak->count().' petak' : '')">
     @can('update', $laporan)<a href="{{ route('laporan.edit', $laporan) }}" class="btn-ghost"><x-ikon n="edit" class="h-4 w-4"/> Ubah</a>@endcan
     @can('delete', $laporan)
         <form method="POST" action="{{ route('laporan.destroy', $laporan) }}" onsubmit="return confirm('Hapus laporan ini beserta fotonya?')">@csrf @method('DELETE')
@@ -15,53 +17,91 @@
 
 <div class="grid gap-5 lg:grid-cols-3">
     <div class="space-y-5 lg:col-span-2">
+        {{-- A. Identitas --}}
         <section class="panel p-5">
-            <div class="flex flex-wrap items-center gap-2"><x-status :s="$laporan->status()"/><x-verifikasi :s="$laporan->status_verifikasi"/>@if($laporan->mt)<span class="chip-kosong">MT {{ ['', 'I', 'II', 'III'][$laporan->mt] }}</span>@endif</div>
+            <div class="flex flex-wrap items-center gap-2">
+                <x-status :s="$laporan->status()"/><x-verifikasi :s="$laporan->status_verifikasi"/>
+                <span class="chip-kosong">{{ $laporan->jenis_label }}</span>
+                @if($laporan->mt)<span class="chip-kosong">{{ K::MT[$laporan->mt] ?? 'MT '.$laporan->mt }}</span>@endif
+            </div>
+            <dl class="mt-4 grid grid-cols-2 gap-x-6 gap-y-3 text-sm sm:grid-cols-4">
+                <div><dt class="text-basalt-soft">Kabupaten</dt><dd class="font-medium">{{ $s->daerahIrigasi->kabupaten?->nama ?? '–' }}</dd></div>
+                <div><dt class="text-basalt-soft">Cuaca</dt><dd class="font-medium">{{ K::CUACA[$laporan->cuaca] ?? '–' }}</dd></div>
+                <div><dt class="text-basalt-soft">Hujan 7 hari</dt><dd class="font-medium">{{ K::HUJAN_7_HARI[$laporan->hujan_7hari] ?? '–' }}</dd></div>
+                <div><dt class="text-basalt-soft">Tindakan pintu</dt><dd class="font-medium">{{ K::TINDAKAN_PINTU[$laporan->tindakan_operasi] ?? '–' }}@if($laporan->atas_perintah)<span class="block text-xs font-normal text-basalt-soft">atas perintah {{ $laporan->atas_perintah }}</span>@endif</dd></div>
+            </dl>
+            <dl class="mt-4 grid grid-cols-2 gap-x-6 gap-y-3 border-t border-savana-line pt-4 text-sm sm:grid-cols-4">
+                <div><dt class="text-basalt-soft">Luas tanam</dt><dd class="font-gauge text-xl font-semibold">{{ angka($laporan->luas_tanam_ha, 2) }} <span class="text-sm">Ha</span></dd></div>
+                <div><dt class="text-basalt-soft">Terdampak kering</dt><dd class="font-gauge text-xl font-semibold text-status-siaga">{{ angka($laporan->luas_kering_ha, 2) }} <span class="text-sm">Ha</span></dd></div>
+                <div><dt class="text-basalt-soft">Sudah panen</dt><dd class="font-gauge text-xl font-semibold">{{ angka($laporan->luas_panen_ha, 2) }} <span class="text-sm">Ha</span></dd></div>
+                <div><dt class="text-basalt-soft">Petak kekurangan air</dt><dd class="font-gauge text-xl font-semibold">{{ $laporan->petakKekuranganAir() }} <span class="text-sm">dari {{ $laporan->petak->count() }}</span></dd></div>
+            </dl>
             @if($laporan->debit_intake_lps !== null)
-            <p class="mt-3 text-xs text-basalt-mute">Data air di bawah berasal dari form lama (sebelum laporan air dipisah ke Manager).</p>
-            <dl class="mt-2 grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4">
-                <div><dt class="text-xs text-basalt-soft">{{ $laporan->petak ? 'Debit pintu '.$laporan->petak->kode : 'Debit intake' }}</dt><dd class="font-gauge text-2xl font-semibold">{{ angka($laporan->debit_intake_lps, 1) }} <span class="text-sm">L/dt</span></dd></div>
-                <div><dt class="text-xs text-basalt-soft">TMA</dt><dd class="font-gauge text-2xl font-semibold">{{ angka($laporan->tma_cm, 1) }} <span class="text-sm">cm</span></dd></div>
-                <div><dt class="text-xs text-basalt-soft">Kondisi saluran</dt><dd class="font-gauge text-2xl font-semibold">{{ LH::KONDISI[$laporan->kondisi_saluran] ?? '-' }}</dd></div>
-                <div><dt class="text-xs text-basalt-soft">Bukaan pintu</dt><dd class="font-gauge text-2xl font-semibold">{{ $laporan->bukaan_pintu_persen !== null ? $laporan->bukaan_pintu_persen.' %' : '–' }}</dd></div>
-            </dl>
-            @endif
-            <dl class="mt-5 grid grid-cols-2 gap-x-6 gap-y-3 border-t border-savana-line pt-4 text-sm sm:grid-cols-3">
-                <div><dt class="text-basalt-soft">Fase tanaman</dt><dd class="font-medium">{{ LH::FASE[$laporan->fase_tanaman] ?? '–' }}</dd></div>
-                <div><dt class="text-basalt-soft">Luas tanam</dt><dd class="font-medium">{{ angka($laporan->luas_tanam_ha, 2) }} Ha @if($laporan->petak?->luas_layanan_ha)<span class="text-basalt-mute">dari {{ angka_r($laporan->petak->luas_layanan_ha) }} Ha petak</span>@elseif($s->luas_ha)<span class="text-basalt-mute">dari {{ angka($s->luas_ha) }} Ha</span>@endif</dd></div>
-                <div class="col-span-2 sm:col-span-3"><dt class="text-basalt-soft">Komoditas</dt>
-                    <dd class="mt-1 flex flex-wrap gap-2">
-                        @forelse($laporan->komoditas() as $k)
-                            <span class="rounded-md border border-savana-line px-2.5 py-1"><b>{{ $k['label'] }}</b> {{ angka($k['luas'], 2) }} Ha @if($k['jenis'])<span class="text-basalt-soft">· {{ $k['jenis'] }}</span>@endif</span>
-                        @empty
-                            <span class="text-basalt-mute">Tidak ada tanaman (bera)</span>
-                        @endforelse
-                    </dd></div>
-                <div><dt class="text-basalt-soft">Tanaman sehat</dt><dd class="font-medium">{{ angka($laporan->luas_hijau_ha, 2) }} Ha</dd></div>
-                <div><dt class="text-basalt-soft">Tanaman kekeringan</dt><dd class="font-medium text-status-siaga">{{ angka($laporan->luas_kering_ha, 2) }} Ha</dd></div>
-                <div><dt class="text-basalt-soft">Puso</dt><dd class="font-medium text-status-kritis">{{ angka($laporan->luas_puso_ha, 2) }} Ha</dd></div>
-                <div><dt class="text-basalt-soft">Panen</dt><dd class="font-medium">{{ angka($laporan->luas_panen_ha, 2) }} Ha</dd></div>
-            </dl>
-            @if($laporan->kendala)
-                <div class="mt-4 rounded-md bg-savana px-4 py-3 text-sm"><p class="font-semibold">Kendala</p><p class="whitespace-pre-line">{{ $laporan->kendala }}</p></div>
+                <p class="mt-4 border-t border-savana-line pt-3 text-xs text-basalt-mute">Form lama (sebelum laporan air dipisah ke Manager): debit {{ angka($laporan->debit_intake_lps, 1) }} L/dt · TMA {{ angka($laporan->tma_cm, 1) }} cm · saluran {{ LH::KONDISI[$laporan->kondisi_saluran] ?? '–' }}.</p>
             @endif
         </section>
-        @if($laporan->sesiPintu && $laporan->sesiPintu->pembacaan->isNotEmpty())
-            <section class="panel overflow-x-auto p-5">
-                <h2 class="text-lg font-semibold">Debit &amp; TMA pintu air</h2>
+
+        {{-- B. Pembacaan pintu --}}
+        <section class="panel overflow-x-auto p-5">
+            <h2 class="text-lg font-semibold"><span class="bagian-huruf">B</span>Pembacaan pintu air</h2>
+            @if($laporan->sesiPintu && $laporan->sesiPintu->pembacaan->isNotEmpty())
                 <table class="table-base mt-2">
-                    <thead><tr><th>Pintu</th><th class="text-right">Debit (L/dt)</th><th class="text-right">TMA mistar (cm)</th><th class="text-right">Q rencana</th></tr></thead>
+                    <thead><tr><th>Pintu</th><th class="text-right">TMA hulu (cm)</th><th class="text-right">Bukaan (cm)</th><th class="text-right">Debit (L/dt)</th><th>Kondisi pintu</th><th>Kondisi saluran</th><th>Keterangan</th></tr></thead>
                     <tbody>
                     @foreach($laporan->sesiPintu->pembacaan->sortBy(fn ($b) => [\App\Models\PintuAir::URUTAN_TINGKAT[$b->pintu->tingkat] ?? 9, $b->pintu->kode]) as $b)
-                        <tr>
-                            <td><a href="{{ route('pintu.show', $b->pintu) }}" class="font-semibold text-saluran-600">{{ $b->pintu->kode }}</a><span class="block text-xs text-basalt-soft">{{ $b->pintu->tingkat_label }}</span></td>
-                            <td class="whitespace-nowrap text-right">{{ angka_r($b->debit_lps) }} <x-status-pintu :s="$b->pintu->statusDebit($b->debit_lps)"/></td>
+                        <tr @class(['bg-[#FBF0CC]/40' => $b->bermasalah()])>
+                            <td class="whitespace-nowrap"><a href="{{ route('pintu.show', $b->pintu) }}" class="font-semibold text-saluran-600">{{ $b->pintu->kode }}</a><span class="block text-xs text-basalt-soft">{{ $b->pintu->tingkat_label }}</span></td>
                             <td class="whitespace-nowrap text-right">{{ angka_r($b->tma_cm) }} <x-status-pintu :s="$b->pintu->statusTma($b->tma_cm)"/></td>
-                            <td class="text-right text-xs">{{ $b->pintu->debit_rencana_lps ? angka_r($b->pintu->debit_rencana_lps).' L/dt' : '–' }}</td>
+                            <td class="text-right">{{ angka_r($b->bukaan_cm) }}</td>
+                            <td class="whitespace-nowrap text-right">{{ angka_r($b->debit_lps) }} <x-status-pintu :s="$b->pintu->statusDebit($b->debit_lps)"/></td>
+                            <td class="whitespace-nowrap text-xs" title="{{ K::teks(K::KONDISI_PINTU, $b->kondisi_pintu) }}">{{ K::singkat(K::KONDISI_PINTU, $b->kondisi_pintu) ?? '–' }}</td>
+                            <td class="whitespace-nowrap text-xs">{{ K::singkat(K::KONDISI_SALURAN, $b->kondisi_saluran) ?? '–' }}</td>
+                            <td class="text-xs">{{ $b->catatan }}</td>
                         </tr>
                     @endforeach
                     </tbody>
                 </table>
+            @else
+                <p class="mt-2 text-sm text-basalt-soft">Tidak ada pembacaan pintu di laporan ini.</p>
+            @endif
+        </section>
+
+        {{-- C. Kondisi tanaman per petak --}}
+        <section class="panel overflow-x-auto p-5">
+            <h2 class="text-lg font-semibold"><span class="bagian-huruf">C</span>Kondisi tanaman per petak tersier</h2>
+            <table class="table-base mt-2">
+                <thead><tr><th>Petak</th><th class="text-right">Luas baku</th><th class="text-right">Luas tanam</th><th>Tanaman</th><th>Fase</th><th class="text-right">Umur</th><th>Kecukupan air</th><th class="text-right">Kering</th><th>Status</th></tr></thead>
+                <tbody>
+                @forelse($laporan->petak->sortBy(fn ($b) => $b->pintu?->kode) as $b)
+                    <tr>
+                        <td class="whitespace-nowrap"><span class="font-semibold">{{ $b->pintu?->kode ?? 'Seluruh Sub-D.I.' }}</span>@if($b->keterangan)<span class="block max-w-[12rem] text-xs text-basalt-soft">{{ $b->keterangan }}</span>@endif</td>
+                        <td class="text-right">{{ $b->luas_baku_ha !== null ? angka_r($b->luas_baku_ha) : '–' }}</td>
+                        <td class="text-right">{{ angka_r($b->luas_tanam_ha) }}</td>
+                        <td class="text-xs">{{ K::teks(K::JENIS_TANAMAN, $b->jenis_tanaman) ?? '–' }}</td>
+                        <td class="text-xs" title="{{ K::teks(K::FASE, $b->fase) }}">{{ K::singkat(K::FASE, $b->fase) ?? '–' }}</td>
+                        <td class="whitespace-nowrap text-right">{{ $b->umur_hst !== null ? $b->umur_hst.' HST' : '–' }}</td>
+                        <td class="whitespace-nowrap text-xs" title="{{ K::teks(K::KECUKUPAN_AIR, $b->kecukupan_air) }}">{{ K::singkat(K::KECUKUPAN_AIR, $b->kecukupan_air) ?? '–' }}</td>
+                        <td class="text-right">{{ angka_r($b->luas_kering_ha) }}</td>
+                        <td><x-status :s="$b->status ?? $b->hitungStatus()"/></td>
+                    </tr>
+                @empty
+                    <tr><td colspan="9" class="text-basalt-soft">Belum ada rincian petak.</td></tr>
+                @endforelse
+                </tbody>
+            </table>
+            <p class="mt-2 text-xs text-basalt-mute">Luas dalam Ha. Status petak dari kode kecukupan air (C = Aman, KR = Waspada, KS = Siaga, KB = Kritis; Bj = kelebihan air).</p>
+        </section>
+
+        {{-- D. Permasalahan --}}
+        @if($laporan->kendala || $laporan->usulan || $laporan->dokumentasi)
+            <section class="panel space-y-3 p-5 text-sm">
+                <h2 class="text-lg font-semibold"><span class="bagian-huruf">D</span>Permasalahan dan dokumentasi</h2>
+                @if($laporan->kendala)<div><p class="font-semibold">Permasalahan</p><p class="whitespace-pre-line">{{ $laporan->kendala }}</p></div>@endif
+                @if($laporan->usulan)<div><p class="font-semibold">Usulan / tindak lanjut</p><p class="whitespace-pre-line">{{ $laporan->usulan }}</p></div>@endif
+                @if($laporan->dokumentasi)
+                    <div><p class="font-semibold">Dokumentasi foto</p>
+                        <ul class="mt-1 grid gap-1 sm:grid-cols-2">@foreach(K::DOKUMENTASI_PPA as $k => $l)<li class="{{ in_array($k, $laporan->dokumentasi) ? '' : 'text-basalt-mute line-through' }}">{{ in_array($k, $laporan->dokumentasi) ? '☑' : '☐' }} {{ $l }}</li>@endforeach</ul></div>
+                @endif
             </section>
         @endif
 
@@ -73,9 +113,9 @@
         @endif
 
         <section class="panel p-5">
-            <h2 class="text-lg font-semibold">Kekeringan 14 laporan terakhir</h2>
+            <h2 class="text-lg font-semibold">Luas tanam &amp; kekeringan, 14 laporan terakhir</h2>
             @if($riwayat->count() < 2)
-                <p class="mt-2 text-sm text-basalt-soft">Grafik muncul setelah ada minimal dua laporan untuk {{ $laporan->petak ? 'petak' : 'Sub-D.I.' }} ini.</p>
+                <p class="mt-2 text-sm text-basalt-soft">Grafik muncul setelah ada minimal dua laporan petugas ini untuk Sub-D.I. ini.</p>
             @else
                 <div class="mt-4 flex h-40 items-end gap-1.5" role="img" aria-label="Grafik luas tanam dan kekeringan">
                     @foreach($riwayat as $r)

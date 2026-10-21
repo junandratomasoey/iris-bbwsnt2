@@ -31,7 +31,7 @@
     </template>
     <dl class="mt-3 grid grid-cols-2 gap-px overflow-hidden rounded-md border border-savana-line bg-savana-line text-sm">
         <div class="bg-white px-3 py-2"><dt class="text-[11px] text-basalt-soft">Luas fungsional</dt><dd class="font-gauge text-xl font-semibold leading-tight"><span x-text="fmt(diPilih.luas_ha)"></span> <span class="text-xs font-normal">Ha</span></dd></div>
-        <div class="bg-white px-3 py-2" x-show="!modeRekap"><dt class="text-[11px] text-basalt-soft">Sub-D.I. melapor (3 hari)</dt><dd class="font-gauge text-xl font-semibold leading-tight"><span x-text="diPilih.sub_lapor"></span><span class="text-sm font-normal text-basalt-soft" x-text="' / ' + diPilih.jumlah_sub"></span></dd></div>
+        <div class="bg-white px-3 py-2" x-show="!modeRekap"><dt class="text-[11px] text-basalt-soft">Sub-D.I. melapor (7 hari)</dt><dd class="font-gauge text-xl font-semibold leading-tight"><span x-text="diPilih.sub_lapor"></span><span class="text-sm font-normal text-basalt-soft" x-text="' / ' + diPilih.jumlah_sub"></span></dd></div>
         <div class="bg-white px-3 py-2" x-show="modeRekap"><dt class="text-[11px] text-basalt-soft">Hari kritis / siaga · lapor</dt><dd class="font-gauge text-xl font-semibold leading-tight"><span x-text="diPilih.hari?.kritis ?? 0"></span><span class="text-sm font-normal text-basalt-soft" x-text="` / ${diPilih.hari?.siaga ?? 0} · ${diPilih.kepatuhan ?? 0}%`"></span></dd></div>
         <div class="bg-white px-3 py-2"><dt class="text-[11px] text-basalt-soft" x-text="modeRekap ? 'Tanaman kekeringan (puncak)' : 'Tanaman kekeringan'">Tanaman kekeringan</dt><dd class="font-gauge text-xl font-semibold leading-tight" :class="diPilih.luas_kering_ha > 0 && 'text-status-siaga'"><span x-text="fmt(diPilih.luas_kering_ha, 1)"></span> <span class="text-xs font-normal">Ha</span></dd></div>
         <div class="bg-white px-3 py-2"><dt class="text-[11px] text-basalt-soft" x-text="modeRekap ? 'Puso (puncak)' : 'Puso'">Puso</dt><dd class="font-gauge text-xl font-semibold leading-tight" :class="diPilih.luas_puso_ha > 0 && 'text-status-kritis'"><span x-text="fmt(diPilih.luas_puso_ha, 1)"></span> <span class="text-xs font-normal">Ha</span></dd></div>
@@ -44,23 +44,23 @@
 
 <template x-if="detail">
 <div>
-    {{-- laporan air Manager terakhir (berlaku 3 hari) --}}
-    <section class="border-b border-savana-line px-4 py-3 text-xs" aria-label="Air sungai, intake dan saluran">
+    {{-- laporan Manager Air terakhir (berlaku 7 hari) --}}
+    <section class="border-b border-savana-line px-4 py-3 text-xs" aria-label="Bendung, intake dan saluran primer">
         <div class="flex items-baseline justify-between gap-2">
-            <h3 class="text-sm font-semibold">Air sungai, intake & saluran</h3>
-            <template x-if="detail.air"><span class="font-semibold" :style="`color:${detail.air.warna}`" x-text="'Saluran ' + String(detail.air.kondisi).toLowerCase()"></span></template>
+            <h3 class="text-sm font-semibold">Bendung, intake & saluran primer</h3>
+            <template x-if="detail.air"><span class="font-semibold" :style="`color:${detail.air.warna}`" x-text="detail.air.status_label"></span></template>
         </div>
         <template x-if="detail.air">
             <div class="mt-1 text-basalt-soft">
-                <p x-text="'Laporan Manager ' + detail.air.tanggal"></p>
+                <p x-text="['Laporan Manager Air ' + detail.air.tanggal, detail.air.kondisi].filter(Boolean).join(' · ')"></p>
                 @if($internal)
-                    <p class="mt-0.5 text-basalt" x-text="[detail.air.debit_sungai !== null ? `Sungai ${fmt(detail.air.debit_sungai, 2)} m³/dt` : null, detail.air.tma_sungai !== null ? `TMA sungai ${fmt(detail.air.tma_sungai, 0)} cm` : null, `Intake ${fmt(detail.air.debit_intake, 1)} L/dt`, detail.air.tma_intake !== null ? `TMA intake ${fmt(detail.air.tma_intake, 0)} cm` : null].filter(Boolean).join(' · ')"></p>
+                    <p class="mt-0.5 text-basalt" x-text="[detail.air.debit_sungai !== null ? `Sungai ${fmt(detail.air.debit_sungai, 2)} m³/dt` : null, detail.air.tma_sungai !== null ? `TMA hulu bendung ${fmt(detail.air.tma_sungai, 0)} cm` : null, detail.air.debit_intake !== null ? `Masuk saluran induk ${fmt(detail.air.debit_intake, 1)} L/dt` : null, detail.air.tma_intake !== null ? `TMA hilir intake ${fmt(detail.air.tma_intake, 0)} cm` : null].filter(Boolean).join(' · ')"></p>
                     <p x-show="detail.air.catatan" class="mt-0.5 italic" x-text="detail.air.catatan"></p>
-                    <a :href="detail.air.url" class="font-semibold text-saluran-600">Laporan air</a>
+                    <a :href="detail.air.url" class="font-semibold text-saluran-600">Laporan Manager Air</a>
                 @endif
             </div>
         </template>
-        <p x-show="!detail.air" class="mt-1 text-basalt-mute">Belum ada laporan air dari Manager dalam 3 hari terakhir.</p>
+        <p x-show="!detail.air" class="mt-1 text-basalt-mute">Belum ada laporan Manager Air dalam 7 hari terakhir.</p>
     </section>
 
     {{-- riwayat 30 hari: satu kotak per hari, warna = status terberat hari itu --}}
@@ -151,17 +151,17 @@
                     <p class="text-basalt-mute" x-text="[s.lokasi, fmt(s.luas_ha) + ' Ha'].filter(Boolean).join(' · ')"></p>
                     <template x-if="s.laporan">
                         <div class="mt-1 text-basalt-soft">
-                            <p x-text="[s.laporan.tanggal, s.laporan.kondisi ? 'saluran ' + String(s.laporan.kondisi).toLowerCase() : null, s.laporan.fase].filter(Boolean).join(' · ')"></p>
+                            <p x-text="[s.laporan.tanggal, s.laporan.kondisi ? 'saluran ' + String(s.laporan.kondisi).toLowerCase() : null, s.laporan.kekurangan_air ? s.laporan.kekurangan_air + ' petak kurang air' : null].filter(Boolean).join(' · ')"></p>
                             <p x-show="s.laporan.komoditas" x-text="s.laporan.komoditas"></p>
-                            <p>Tanam <b class="text-basalt" x-text="fmt(s.laporan.tanam, 1)"></b> · kering <b class="text-basalt" x-text="fmt(s.laporan.kering, 1)"></b> · puso <b class="text-basalt" x-text="fmt(s.laporan.puso, 1)"></b> Ha</p>
+                            <p>Tanam <b class="text-basalt" x-text="fmt(s.laporan.tanam, 1)"></b> · kering <b class="text-basalt" x-text="fmt(s.laporan.kering, 1)"></b><span x-show="s.laporan.puso"> · puso <b class="text-basalt" x-text="fmt(s.laporan.puso, 1)"></b></span> Ha</p>
                             @if($internal)<p x-show="!(s.laporan.petak || []).length && s.laporan.debit !== null">Debit <b class="text-basalt" x-text="fmt(s.laporan.debit, 1)"></b> L/dt · TMA <b class="text-basalt" x-text="fmt(s.laporan.tma, 1)"></b> cm · <a :href="s.laporan.url" class="font-semibold text-saluran-600">Laporan</a></p>@endif
                             <template x-if="(s.laporan.petak || []).length">
                                 <ul class="mt-1.5 space-y-1 border-l-2 border-savana-line pl-2">
-                                    <template x-for="pt in s.laporan.petak" :key="pt.kode">
+                                    <template x-for="pt in s.laporan.petak" :key="pt.kode || 'sub'">
                                         <li class="flex items-baseline justify-between gap-2">
-                                            <span><span class="mr-1 inline-block h-2 w-2 rounded-full" :style="`background:${pt.warna}`"></span><b class="text-basalt" x-text="'Petak ' + pt.kode"></b>
-                                                <span x-text="` · ${pt.tanggal} · kering ${fmt(pt.kering, 1)}/${fmt(pt.tanam, 1)} Ha` + (pt.puso ? ` · puso ${fmt(pt.puso, 1)}` : '')"></span>
-                                                @if($internal)<span x-text="` · ${fmt(pt.debit, 1)} L/dt`"></span> <a :href="pt.url" class="font-semibold text-saluran-600">Laporan</a>@endif
+                                            <span><span class="mr-1 inline-block h-2 w-2 rounded-full" :style="`background:${pt.warna}`"></span><b class="text-basalt" x-text="pt.kode ? 'Petak ' + pt.kode : (pt.nama || 'Seluruh Sub-D.I.')"></b>
+                                                <span x-text="` · ${pt.tanggal}` + (pt.jenis ? ` · ${pt.jenis}` : '') + (pt.umur !== null && pt.umur !== undefined ? ` ${pt.umur} HST` : '') + (pt.kecukupan ? ` · air ${pt.kecukupan}` : '') + ` · kering ${fmt(pt.kering, 1)}/${fmt(pt.tanam, 1)} Ha` + (pt.puso ? ` · puso ${fmt(pt.puso, 1)}` : '')" :title="pt.kecukupan_label || ''"></span>
+                                                @if($internal)<a :href="pt.url" class="font-semibold text-saluran-600">Laporan</a>@endif
                                             </span>
                                             <span class="shrink-0 font-semibold" :style="`color:${pt.warna}`" x-text="pt.status_label"></span>
                                         </li>
@@ -170,7 +170,7 @@
                             </template>
                         </div>
                     </template>
-                    <p x-show="!s.laporan" class="mt-1 text-basalt-mute">Belum ada laporan 3 hari terakhir.</p>
+                    <p x-show="!s.laporan" class="mt-1 text-basalt-mute">Belum ada laporan PPA 7 hari terakhir.</p>
                     @if($internal)
                         <div x-show="s.petugas.length" class="mt-1.5 flex flex-wrap gap-1">
                             <template x-for="p in s.petugas.slice(0, 4)" :key="p.nama">

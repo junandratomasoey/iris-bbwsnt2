@@ -44,10 +44,11 @@
 
 <div class="mt-5 grid gap-5 lg:grid-cols-3">
     <section class="panel p-5">
-        <h2 class="text-lg font-semibold">Laporan masuk hari ini</h2>
+        <h2 class="text-lg font-semibold">Laporan masuk pekan ini</h2>
+        <p class="text-xs text-basalt-mute">Sejak Senin {{ $hari->copy()->startOfWeek()->translatedFormat('d M') }} (rutin tiap Senin)</p>
         <p class="mt-2 font-gauge text-4xl font-semibold">{{ $laporHariIni }}<span class="text-xl text-basalt-mute"> / {{ $totalSub }}</span></p>
-        <p class="text-sm text-basalt-soft">Sub-D.I. sudah ada laporan tanaman PPA ({{ $persenLapor }}%)</p>
-        <p class="mt-2 text-sm"><a href="{{ route('laporan-air.index') }}" class="hover:underline"><b class="font-gauge text-xl">{{ $airHariIni }}</b><span class="text-basalt-mute"> / {{ $totalDi }}</span> D.I. sudah ada laporan air Manager</a></p>
+        <p class="text-sm text-basalt-soft">Sub-D.I. sudah ada laporan PPA ({{ $persenLapor }}%)</p>
+        <p class="mt-2 text-sm"><a href="{{ route('laporan-air.index') }}" class="hover:underline"><b class="font-gauge text-xl">{{ $airHariIni }}</b><span class="text-basalt-mute"> / {{ $totalDi }}</span> D.I. sudah ada laporan Manager Air</a></p>
         <ul class="mt-4 space-y-2.5">
             @foreach($kepatuhan as $k)
                 @php $p = $k['total'] ? $k['masuk'] / $k['total'] * 100 : 0; @endphp
@@ -77,7 +78,7 @@
             <div class="flex items-baseline justify-between"><dt class="text-sm text-basalt-soft">Puso</dt><dd class="font-gauge text-2xl font-semibold text-status-kritis">{{ angka($ringkasan->sum('luas_puso_ha'), 1) }} Ha</dd></div>
             <div class="flex items-baseline justify-between"><dt class="text-sm text-basalt-soft">Panen</dt><dd class="font-gauge text-2xl font-semibold text-status-aman">{{ angka($ringkasan->sum('luas_panen_ha'), 1) }} Ha</dd></div>
         </dl>
-        <p class="mt-3 text-xs text-basalt-mute">Dijumlah dari laporan terakhir tiap Sub-D.I. dalam 3 hari.</p>
+        <p class="mt-3 text-xs text-basalt-mute">Dijumlah dari laporan terakhir tiap Sub-D.I. dalam 7 hari.</p>
     </section>
 
     <section class="panel p-5">
@@ -118,7 +119,7 @@
         <p class="text-xs text-basalt-mute">Diurutkan dari status terberat dan luas tanaman kekeringan.</p>
     </div>
     @if($kritis->isEmpty())
-        <x-kosong judul="Belum ada Sub-D.I. berstatus Waspada ke atas">Status akan muncul setelah petugas mengirim laporan harian.</x-kosong>
+        <x-kosong judul="Belum ada Sub-D.I. berstatus Waspada ke atas">Status akan muncul setelah PPA mengirim laporan.</x-kosong>
     @else
         <div class="overflow-x-auto">
             <table class="table-base">

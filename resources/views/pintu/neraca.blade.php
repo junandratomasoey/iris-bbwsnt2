@@ -88,7 +88,8 @@
                         <td class="text-xs">
                             @if($l)
                                 <a href="{{ route('laporan.show', $l) }}" class="inline-flex items-center gap-1"><x-status :s="$r['status_lahan']"/></a>
-                                <span class="block text-basalt-soft">{{ $l->tanggal->translatedFormat('d M') }} · kering {{ angka_r($l->luas_kering_ha) }}/{{ angka_r($l->luas_tanam_ha) }} Ha{{ $l->luas_puso_ha > 0 ? ' · puso '.angka_r($l->luas_puso_ha).' Ha' : '' }}</span>
+                                @php $b = $r['petak']; @endphp
+                                <span class="block text-basalt-soft">{{ $l->tanggal->translatedFormat('d M') }}{{ $b->kecukupan_air ? ' · air '.$b->kecukupan_air : '' }} · kering {{ angka_r($b->luas_kering_ha) }}/{{ angka_r($b->luas_tanam_ha) }} Ha{{ $b->luas_puso_ha > 0 ? ' · puso '.angka_r($b->luas_puso_ha).' Ha' : '' }}</span>
                             @else<span class="text-basalt-mute">Belum ada laporan minggu ini</span>@endif
                         </td>
                     </tr>

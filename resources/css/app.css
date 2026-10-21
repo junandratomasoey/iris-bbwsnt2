@@ -31,6 +31,12 @@
     .chip-kritis { @apply chip bg-[#F6D9D7] text-[#7E1A14]; }
     .chip-lebih { @apply chip bg-[#DCEBF7] text-[#1B4F7A]; }
     .chip-kosong { @apply chip bg-savana-deep text-basalt-soft; }
+    /* pilihan bergaya tombol (radio/checkbox asli tersembunyi) */
+    .opsi { @apply relative inline-flex min-h-[2.25rem] cursor-pointer select-none items-center justify-center gap-1 rounded-md border border-savana-line bg-white px-2.5 py-1.5 text-center text-[13px] font-medium leading-tight text-basalt-soft has-[:checked]:border-saluran-600 has-[:checked]:bg-saluran-600 has-[:checked]:text-white has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-saluran-500; }
+    .opsi > input { @apply sr-only; }
+    .opsi-kode { @apply font-gauge text-xs font-bold opacity-80; }
+    .bagian { @apply font-gauge text-lg font-semibold; }
+    .bagian-huruf { @apply mr-1.5 inline-flex h-6 w-6 items-center justify-center rounded bg-basalt text-xs font-bold text-white align-[2px]; }
     .nav-link { @apply flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-saluran-100 hover:bg-saluran-700 hover:text-white; }
     .nav-link.active { @apply bg-saluran-800 text-white; }
 }

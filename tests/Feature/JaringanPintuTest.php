@@ -5,12 +5,14 @@ namespace Tests\Feature;
 use App\Models\DaerahIrigasi;
 use App\Models\Kabupaten;
 use App\Models\LaporanHarian;
+use App\Models\LaporanPetak;
 use App\Models\PembacaanPintu;
 use App\Models\PintuAir;
 use App\Models\SesiPintu;
 use App\Models\SubDaerahIrigasi;
 use App\Models\User;
 use App\Services\KondisiService;
+use App\Services\PintuService;
 use App\Services\RekapService;
 use App\Support\Periode;
 use App\Support\Role;
@@ -62,17 +64,18 @@ class JaringanPintuTest extends TestCase
         $this->t2 = $p('BOs.1 ka', 'tersier', $this->sek, ['luas_layanan_ha' => 100]);
     }
 
+    /** Laporan PPA: petak = [pintu tersier id => isian], baca = [pintu id => isian]. */
     private function laporan(array $ubah = []): array
     {
-        if (! empty($ubah['pintu_air_id']) && ! isset($ubah['baca'])) {
-            $ubah['baca'] = [$ubah['pintu_air_id'] => ['debit' => 40, 'tma' => 30]];   // pintu petak wajib diisi
-        }
-
         return $ubah + [
-            'tanggal' => today()->toDateString(), 'sub_daerah_irigasi_id' => $this->sub->id,
-            'debit_intake_lps' => 40, 'tma_cm' => 30, 'kondisi_saluran' => 'normal',
-            'luas_tanam_ha' => 40, 'luas_hijau_ha' => 40, 'luas_kering_ha' => 0, 'luas_panen_ha' => 0, 'luas_puso_ha' => 0,
+            'tanggal' => today()->toDateString(), 'jam' => '07:30', 'jenis' => 'rutin', 'sub_daerah_irigasi_id' => $this->sub->id,
+            'petak' => [], 'baca' => [],
         ];
+    }
+
+    private function petak(float $tanam, string $kecukupan = 'C', float $kering = 0, array $lain = []): array
+    {
+        return $lain + ['jenis_tanaman' => 'P', 'luas_tanam_ha' => $tanam, 'fase' => 3, 'umur_hst' => 45, 'kecukupan_air' => $kecukupan, 'luas_kering_ha' => $kering];
     }
 
     private function tugaskan(): void
@@ -122,7 +125,7 @@ class JaringanPintuTest extends TestCase
         $this->assertSame(1, SesiPintu::count());
 
         // dashboard petugas: pintu saya
-        $this->actingAs($this->ppaA)->get(route('dashboard'))->assertOk()->assertSee('Pembacaan pintu air saya')->assertSee('Petak BOs.1 ki');
+        $this->actingAs($this->ppaA)->get(route('dashboard'))->assertOk()->assertSee('Pembacaan pintu air saya')->assertSee('Petak tugas: BOs.1 ki')->assertSee('Belum ada laporan sejak Senin');
     }
 
     public function test_pintu_hulu_harus_lebih_hulu_dan_tidak_melingkar(): void
@@ -136,43 +139,61 @@ class JaringanPintuTest extends TestCase
 
     public function test_ppa_wajib_lapor_per_petak_tugasnya(): void
     {
-        $this->tugaskan();
-        $this->actingAs($this->ppaA)->get(route('laporan.create', ['sub' => $this->sub->id]))->assertOk()->assertSee('Petak tersier yang dilaporkan');
+        $this->tugaskan();   // t1: A (utama), B (pengganti); t2: B; intake: Manager
+        $this->actingAs($this->ppaA)->get(route('laporan.create', ['sub' => $this->sub->id]))->assertOk()
+            ->assertSee('Kondisi tanaman per petak tersier')->assertSee('Pembacaan pintu air (sekunder/tersier)')->assertDontSee('INTAKE');
 
-        $this->actingAs($this->ppaA)->post(route('laporan.store'), $this->laporan())->assertSessionHasErrors('pintu_air_id');
-        $this->actingAs($this->ppaA)->post(route('laporan.store'), $this->laporan(['pintu_air_id' => $this->t2->id]))->assertSessionHasErrors('pintu_air_id');   // milik B
-        $this->actingAs($this->ppaA)->post(route('laporan.store'), $this->laporan(['pintu_air_id' => $this->t1->id, 'luas_padi_ha' => 60]))
-            ->assertSessionHasErrors('luas_padi_ha');                                                                                                    // > luas layanan 50 Ha
-        $this->actingAs($this->ppaA)->post(route('laporan.store'), $this->laporan(['pintu_air_id' => $this->t1->id]))->assertSessionHasNoErrors();
-        $this->actingAs($this->ppaA)->post(route('laporan.store'), $this->laporan(['pintu_air_id' => $this->t1->id]))->assertSessionHasErrors('sub_daerah_irigasi_id');   // satu per petak per hari
-        $this->actingAs($this->ppaB)->post(route('laporan.store'), $this->laporan(['pintu_air_id' => $this->t2->id, 'luas_padi_ha' => 80, 'luas_kering_ha' => 45, 'kondisi_saluran' => 'kurang']))
-            ->assertSessionHasNoErrors();                                                                                                              // petak lain, Sub-D.I. sama, hari sama
+        $t1 = $this->t1->id;
+        $t2 = $this->t2->id;
+        // petak tugas utama & TMA pintunya wajib
+        $this->actingAs($this->ppaA)->post(route('laporan.store'), $this->laporan(['baca' => [$t1 => ['tma' => 20]]]))->assertSessionHasErrors("petak.$t1.jenis_tanaman");
+        $this->actingAs($this->ppaA)->post(route('laporan.store'), $this->laporan(['petak' => [$t1 => $this->petak(40)]]))->assertSessionHasErrors("baca.$t1.tma");
+        $this->actingAs($this->ppaA)->post(route('laporan.store'), $this->laporan(['petak' => [$t1 => $this->petak(60)], 'baca' => [$t1 => ['tma' => 20]]]))
+            ->assertSessionHasErrors("petak.$t1.luas_tanam_ha");                                                                // > luas layanan 50 Ha
+        $this->actingAs($this->ppaA)->post(route('laporan.store'), $this->laporan([
+            'petak' => [$t1 => $this->petak(40), $t2 => $this->petak(80, 'KB')],     // t2 milik B → diabaikan
+            'baca' => [$t1 => ['tma' => 20, 'debit' => 35, 'kondisi_pintu' => 'B', 'kondisi_saluran' => 'N'], $t2 => ['tma' => 99]],
+        ]))->assertSessionHasNoErrors();
+        $la = LaporanHarian::firstOrFail();
+        $this->assertSame([$t1], $la->petak()->pluck('pintu_air_id')->all());
+        $this->assertSame([$t1], $la->sesiPintu->pembacaan()->pluck('pintu_air_id')->all());
+        $this->actingAs($this->ppaA)->post(route('laporan.store'), $this->laporan(['petak' => [$t1 => $this->petak(40)], 'baca' => [$t1 => ['tma' => 20]]]))
+            ->assertSessionHasErrors('sub_daerah_irigasi_id');                                                                   // satu per petugas per Sub-D.I. per hari
+
+        // B (pengganti t1, utama t2): wajib t2 saja; boleh ikut mengisi t1
+        $this->actingAs($this->ppaB)->post(route('laporan.store'), $this->laporan([
+            'petak' => [$t2 => $this->petak(80, 'KS', 45)], 'baca' => [$t2 => ['tma' => 30, 'kondisi_pintu' => 'RR']],
+        ]))->assertSessionHasNoErrors();
         $this->assertSame(2, LaporanHarian::where('sub_daerah_irigasi_id', $this->sub->id)->count());
-        $this->assertSame($this->t1->id, LaporanHarian::first()->pintu_air_id);
 
-        // kondisi tanaman adalah tugas PPA: Manager tidak bisa membuka/mengirim form laporan harian, tetapi tetap bisa melihat & memverifikasi
+        // kondisi tanaman adalah tugas PPA: Manager tidak bisa membuka/mengirim form laporan PPA, tetapi tetap bisa melihat & memverifikasi
         $this->actingAs($this->manager)->get(route('laporan.create'))->assertForbidden();
         $this->actingAs($this->manager)->post(route('laporan.store'), $this->laporan(['tanggal' => today()->subDay()->toDateString()]))->assertForbidden();
-        $this->actingAs($this->manager)->get(route('laporan.index'))->assertOk()->assertDontSee('Isi laporan hari ini')->assertSee('Baca pintu air');
-        $this->actingAs($this->manager)->post(route('laporan.verifikasi', LaporanHarian::first()), ['keputusan' => 'disetujui'])->assertSessionHasNoErrors();
-        $this->assertSame('disetujui', LaporanHarian::first()->status_verifikasi);
+        $this->actingAs($this->manager)->get(route('laporan.index'))->assertOk()->assertSee('Baca pintu air')->assertSee('BOs.1 ki');
+        $this->actingAs($this->manager)->post(route('laporan.verifikasi', $la), ['keputusan' => 'disetujui'])->assertSessionHasNoErrors();
+        $this->assertSame('disetujui', $la->fresh()->status_verifikasi);
     }
 
     public function test_laporan_per_petak_digabung_untuk_status_dan_rekap(): void
     {
-        $l = fn ($petak, $tanam, $kering, $tgl = null, $kondisi = 'normal') => LaporanHarian::create($this->laporan([
-            'tanggal' => $tgl ?? today()->toDateString(), 'pintu_air_id' => $petak?->id, 'user_id' => $this->ppaA->id,
-            'luas_tanam_ha' => $tanam, 'luas_padi_ha' => $tanam, 'luas_hijau_ha' => $tanam - $kering, 'luas_kering_ha' => $kering, 'kondisi_saluran' => $kondisi,
-        ]));
-        $l(null, 200, 0, today()->subDay()->toDateString());   // laporan lama tingkat Sub-D.I.
-        $l($this->t1, 40, 0);
-        $l($this->t2, 80, 45, null, 'kurang');                  // 56% kering → kritis
+        $buat = function ($user, $tgl, array $petak) {
+            $l = LaporanHarian::create(['tanggal' => $tgl, 'sub_daerah_irigasi_id' => $this->sub->id, 'user_id' => $user->id, 'jenis' => 'rutin']);
+            foreach ($petak as $id => $r) {
+                $l->petak()->create(['pintu_air_id' => $id ?: null] + $r);
+            }
+            $l->hitungTotal();
+
+            return $l;
+        };
+        $buat($this->ppaA, today()->subDay()->toDateString(), [0 => $this->petak(200)]);               // laporan lama tingkat Sub-D.I.
+        $buat($this->ppaA, today()->toDateString(), [$this->t1->id => $this->petak(40)]);
+        $buat($this->ppaB, today()->toDateString(), [$this->t2->id => $this->petak(80, 'KB', 45)]);   // kering berat → kritis
 
         $g = app(KondisiService::class)->laporanTerkini(today())->get($this->sub->id);
         $this->assertSame(120.0, (float) $g->luas_tanam_ha);      // 40 + 80 (laporan Sub-D.I. lama tidak ikut)
         $this->assertSame(45.0, (float) $g->luas_kering_ha);
-        $this->assertSame('kurang', $g->kondisi_saluran);
         $this->assertSame(StatusKondisi::KRITIS, $g->status());   // petak terberat
+        $this->assertSame(1, $g->kekurangan_air);
         $this->assertCount(2, $g->petak_rinci);
 
         $ring = app(KondisiService::class)->ringkasanDi(today())->get($this->di->id);
@@ -181,12 +202,12 @@ class JaringanPintuTest extends TestCase
 
         $r = app(RekapService::class)->rekap(Periode::dariRequest(new Request(['periode' => 'rentang', 'dari' => today()->subDay()->toDateString(), 'sampai' => today()->toDateString()])), null);
         $d = collect($r['di'])->firstWhere('id', $this->di->id);
-        $this->assertSame(120.0, $d['puncak_tanam_ha']);          // puncak per petak dijumlah, tanpa dobel laporan Sub-D.I.
-        $this->assertSame(100, $d['kepatuhan']);                  // 1 Sub-D.I. × 2 hari, keduanya ada laporan
         $this->assertSame(StatusKondisi::KRITIS, $d['terberat']);
+        $this->assertSame(100, $d['kepatuhan']);                  // kepatuhan per pekan: Sub-D.I. melapor di setiap pekan periode
 
         $this->actingAs($this->manager)->getJson(route('api.di', $this->di))->assertOk()
-            ->assertJsonCount(2, 'sub.0.laporan.petak')->assertJsonPath('sub.0.laporan.petak.0.kode', 'BOs.1 ka')->assertJsonPath('sub.0.laporan.petak.0.status', StatusKondisi::KRITIS);
+            ->assertJsonCount(2, 'sub.0.laporan.petak')->assertJsonPath('sub.0.laporan.petak.0.kode', 'BOs.1 ka')
+            ->assertJsonPath('sub.0.laporan.petak.0.status', StatusKondisi::KRITIS)->assertJsonPath('sub.0.laporan.petak.0.kecukupan', 'KB');
         $this->getJson(route('api.publik.di', $this->di))->assertOk()->assertJsonMissingPath('pintu')->assertJsonMissingPath('sub.0.laporan.petak.0.url');
     }
 
@@ -198,7 +219,7 @@ class JaringanPintuTest extends TestCase
         foreach ([[$this->intake, 200], [$this->sek, 100], [$this->t1, 40], [$this->t2, 50]] as [$p, $d]) {
             PembacaanPintu::create(['sesi_pintu_id' => $sesi->id, 'pintu_air_id' => $p->id, 'tanggal' => today(), 'debit_lps' => $d]);
         }
-        $n = app(\App\Services\PintuService::class)->neraca($this->di->id, SesiPintu::seninIni());
+        $n = app(PintuService::class)->neraca($this->di->id, SesiPintu::seninIni());
         $sek = collect($n['neraca'])->firstWhere('pintu.id', $this->sek->id);
         $this->assertSame(90.0, $sek['jumlah_anak']);
         $this->assertSame(10.0, $sek['selisih']);
@@ -215,40 +236,44 @@ class JaringanPintuTest extends TestCase
             ->assertJsonCount(2, 'pintu')->assertJsonPath('pintu.1.hulu', [-10.1, 123.7]);
     }
 
-    public function test_ppa_mengisi_debit_dan_tma_pintu_di_laporan_harian(): void
+    public function test_ppa_mengisi_pembacaan_pintu_di_laporan(): void
     {
         $this->tugaskan();
-        $this->actingAs($this->ppaA)->get(route('laporan.create', ['sub' => $this->sub->id]))->assertOk()->assertSee('Debit &amp; TMA pintu air', false);
-
-        // pintu petak wajib diisi debit & TMA
-        $this->actingAs($this->ppaA)->post(route('laporan.store'), $this->laporan(['pintu_air_id' => $this->t1->id, 'baca' => [$this->t1->id => ['debit' => 35]]]))
-            ->assertSessionHasErrors('baca.'.$this->t1->id.'.tma');
-
-        $this->actingAs($this->ppaA)->post(route('laporan.store'), $this->laporan(['pintu_air_id' => $this->t1->id, 'baca' => [
-            $this->t1->id => ['debit' => 35, 'tma' => 22],
-            $this->sek->id => ['debit' => 120, 'tma' => 48],     // sekunder belum ditugaskan → boleh
-            $this->t2->id => ['debit' => 99, 'tma' => 99],       // milik PPA B → diabaikan
-        ]]))->assertSessionHasNoErrors();
+        $t1 = $this->t1->id;
+        $this->actingAs($this->ppaA)->post(route('laporan.store'), $this->laporan([
+            'petak' => [$t1 => $this->petak(40)],
+            'baca' => [
+                $t1 => ['tma' => 22, 'bukaan' => 15, 'debit' => 35, 'kondisi_pintu' => 'B', 'kondisi_saluran' => 'S', 'catatan' => 'sedimen'],
+                $this->sek->id => ['tma' => 48, 'debit' => 120],   // sekunder belum ditugaskan → boleh
+                $this->intake->id => ['tma' => 99],                // intake = tugas Manager → diabaikan
+            ],
+        ]))->assertSessionHasNoErrors();
 
         $l = LaporanHarian::firstOrFail();
         $sesi = $l->sesiPintu;
         $this->assertSame('harian', $sesi->jenis);
-        $this->assertEqualsCanonicalizing([$this->t1->id, $this->sek->id], $sesi->pembacaan()->pluck('pintu_air_id')->all());
-        $this->assertSame(22.0, PembacaanPintu::where('pintu_air_id', $this->t1->id)->value('tma_cm') + 0.0);
+        $this->assertEqualsCanonicalizing([$t1, $this->sek->id], $sesi->pembacaan()->pluck('pintu_air_id')->all());
+        $b = PembacaanPintu::where('pintu_air_id', $t1)->first();
+        $this->assertSame([22.0, 15.0, 'S'], [$b->tma_cm, $b->bukaan_cm, $b->kondisi_saluran]);
+        $this->assertTrue($b->bermasalah());
 
         // ikut neraca minggu ini
-        $n = app(\App\Services\PintuService::class)->neraca($this->di->id, SesiPintu::seninIni());
+        $n = app(PintuService::class)->neraca($this->di->id, SesiPintu::seninIni());
         $this->assertSame(35.0, collect($n['neraca'])->firstWhere('pintu.id', $this->sek->id)['jumlah_anak']);
+        $this->assertSame(StatusKondisi::AMAN, collect($n['merata'])->firstWhere('pintu.id', $t1)['status_lahan']);
 
-        // diubah lewat laporan, bukan lewat form pembacaan
-        $this->actingAs($this->ppaA)->get(route('pembacaan-pintu.edit', $sesi))->assertForbidden();
-        $this->actingAs($this->ppaA)->put(route('laporan.update', $l), $this->laporan(['pintu_air_id' => $this->t1->id, 'baca' => [$this->t1->id => ['debit' => 30, 'tma' => 20]]]))
+        // debit boleh kosong (tidak ada tabel debit), TMA saja
+        $this->actingAs($this->ppaA)->get(route('pembacaan-pintu.edit', $sesi))->assertForbidden();   // diubah lewat laporan
+        $this->actingAs($this->ppaA)->put(route('laporan.update', $l), $this->laporan(['petak' => [$t1 => $this->petak(40, 'KR')], 'baca' => [$t1 => ['tma' => 20]]]))
             ->assertSessionHasNoErrors();
-        $this->assertSame([$this->t1->id], $sesi->pembacaan()->pluck('pintu_air_id')->all());
-        $this->actingAs($this->ppaA)->get(route('laporan.show', $l))->assertOk()->assertSee('Debit &amp; TMA pintu air', false)->assertSee('BOs.1 ki');
+        $this->assertSame([$t1], $sesi->pembacaan()->pluck('pintu_air_id')->all());
+        $this->assertNull(PembacaanPintu::where('pintu_air_id', $t1)->value('debit_lps'));
+        $this->assertSame(StatusKondisi::WASPADA, $l->fresh()->status());
+        $this->actingAs($this->ppaA)->get(route('laporan.show', $l))->assertOk()->assertSee('Pembacaan pintu air')->assertSee('BOs.1 ki')->assertSee('KR · Kurang');
 
         $this->actingAs($this->ppaA)->delete(route('laporan.destroy', $l));
         $this->assertSame(0, SesiPintu::count());
         $this->assertSame(0, PembacaanPintu::count());
+        $this->assertSame(0, LaporanPetak::count());
     }
 }

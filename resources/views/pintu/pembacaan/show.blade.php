@@ -3,7 +3,10 @@
 <x-judul judul="Pembacaan pintu air · {{ $sesi->tanggal->translatedFormat('l, d M Y') }}" sub="D.I. {{ $sesi->daerahIrigasi->nama }} · {{ $sesi->jenis_label }}{{ $sesi->jam ? ' · pukul '.substr($sesi->jam, 0, 5) : '' }}">
     <a href="{{ route('pintu.index', ['di' => $sesi->daerah_irigasi_id]) }}" class="btn-ghost"><x-ikon n="pintu" class="h-4 w-4"/> Pemantauan pintu</a>
     @if($sesi->laporan_harian_id)
-        @can('update', $sesi->laporanHarian)<a href="{{ route('laporan.edit', $sesi->laporan_harian_id) }}" class="btn-ghost"><x-ikon n="edit" class="h-4 w-4"/> Ubah lewat laporan tanaman</a>@endcan
+        <a href="{{ route('laporan.show', $sesi->laporan_harian_id) }}" class="btn-ghost">Buka laporan PPA</a>
+        @can('update', $sesi->laporanHarian)<a href="{{ route('laporan.edit', $sesi->laporan_harian_id) }}" class="btn-ghost"><x-ikon n="edit" class="h-4 w-4"/> Ubah lewat laporan PPA</a>@endcan
+    @elseif($sesi->laporan_air_id)
+        <a href="{{ route('laporan-air.show', $sesi->laporan_air_id) }}" class="btn-ghost">Buka laporan Manager Air</a>
     @endif
     @if($bolehUbah)
         <a href="{{ route('pembacaan-pintu.edit', $sesi) }}" class="btn-ghost"><x-ikon n="edit" class="h-4 w-4"/> Ubah</a>
@@ -20,7 +23,7 @@
 
 <div class="panel mb-5 overflow-x-auto">
     <table class="table-base">
-        <thead><tr><th>Pintu</th><th class="text-right">Debit (L/dt)</th><th>Dibanding sebelumnya</th><th class="text-right">TMA (cm)</th><th>Dibanding sebelumnya</th><th class="text-right">Bukaan (cm)</th><th>Catatan</th></tr></thead>
+        <thead><tr><th>Pintu</th><th class="text-right">Debit (L/dt)</th><th>Dibanding sebelumnya</th><th class="text-right">TMA (cm)</th><th>Dibanding sebelumnya</th><th class="text-right">Bukaan (cm)</th><th>Kondisi</th><th>Catatan</th></tr></thead>
         <tbody>
         @foreach($baris as $b)
             @php $p = $b->pintu; $lalu = $sebelum[$p->id] ?? null; @endphp
@@ -34,6 +37,7 @@
                     <span class="block text-[11px] text-basalt-mute">normal {{ PintuAir::rentangTeks($p->tma_min_cm, $p->tma_maks_cm, '') }}</span></td>
                 <td><x-perubahan :d="PintuService::perubahan($b, $lalu, 'tma_cm')"/>@if($lalu)<span class="block text-[11px] text-basalt-mute">{{ $lalu->tanggal->translatedFormat('d M') }}: {{ angka_r($lalu->tma_cm) }}</span>@endif</td>
                 <td class="text-right">{{ angka_r($b->bukaan_cm) }}</td>
+                <td class="whitespace-nowrap text-xs">@if($b->kondisi_pintu)<span class="block">Pintu {{ \App\Support\KodeIsian::teks(\App\Support\KodeIsian::KONDISI_PINTU, $b->kondisi_pintu, false) }}</span>@endif @if($b->kondisi_saluran)<span class="block">Saluran {{ mb_strtolower(\App\Support\KodeIsian::KONDISI_SALURAN[$b->kondisi_saluran] ?? $b->kondisi_saluran) }}</span>@endif @if($b->debit_kebutuhan_lps !== null)<span class="block text-basalt-soft">Kebutuhan {{ angka_r($b->debit_kebutuhan_lps) }} L/dt</span>@endif</td>
                 <td class="text-xs">{{ $b->catatan }}</td>
             </tr>
         @endforeach

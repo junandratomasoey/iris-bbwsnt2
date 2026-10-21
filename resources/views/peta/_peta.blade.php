@@ -12,7 +12,7 @@
             <div class="flex items-start justify-between gap-2">
                 <div>
                     <h2 class="text-xl font-semibold leading-tight">Kondisi Daerah Irigasi</h2>
-                    <p class="text-xs text-basalt-soft" x-show="!modeRekap">Dari laporan petugas 3 hari terakhir. Klik D.I. di peta atau daftar untuk foto, infrastruktur, dan riwayatnya.</p>
+                    <p class="text-xs text-basalt-soft" x-show="!modeRekap">Dari laporan petugas 7 hari terakhir (rutin tiap Senin). Klik D.I. di peta atau daftar untuk foto, infrastruktur, dan riwayatnya.</p>
                     <p class="text-xs text-basalt-soft" x-show="modeRekap" x-cloak>Rekap <b x-text="data?.periode?.label"></b> (<span x-text="data?.periode?.keterangan"></span>). Warna = status <span x-text="warna"></span>. Klik D.I. untuk riwayat & foto.</p>
                 </div>
                 <button type="button" class="rounded p-1 hover:bg-savana" @click="panel = false" aria-label="Tutup panel" title="Tutup panel"><x-ikon n="tutup"/></button>

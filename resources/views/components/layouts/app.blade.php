@@ -4,7 +4,7 @@
     $menu = [
         ['dashboard', 'Dashboard', 'dashboard', true],
         ['peta', 'Peta kondisi', 'peta', true],
-        ['laporan.index', 'Laporan harian', 'laporan', true],
+        ['laporan.index', 'Laporan', 'laporan', true],
         ['pintu.index', 'Pintu air', 'pintu', true],
         ['kejadian.index', 'Kejadian kekeringan', 'kejadian', true],
         ['petugas.index', 'Kontak petugas', 'petugas', $u->can('lihat-petugas') || $u->can('kelola-petugas')],
@@ -41,12 +41,12 @@
         <div class="space-y-2 px-3 pb-3">
             @can('lapor-air')
                 <a href="{{ route('laporan-air.create') }}" class="flex items-center justify-center gap-2 rounded-md bg-white px-3 py-2.5 text-sm font-semibold text-saluran-700 hover:bg-saluran-50">
-                    <x-ikon n="di"/> Isi laporan air
+                    <x-ikon n="di"/> Isi laporan Manager Air
                 </a>
             @endcan
             @can('lapor')
                 <a href="{{ route('laporan.create') }}" class="flex items-center justify-center gap-2 rounded-md bg-white px-3 py-2.5 text-sm font-semibold text-saluran-700 hover:bg-saluran-50">
-                    <x-ikon n="tambah"/> Isi laporan tanaman
+                    <x-ikon n="tambah"/> Isi laporan PPA
                 </a>
             @endcan
             @can('isi-pintu')

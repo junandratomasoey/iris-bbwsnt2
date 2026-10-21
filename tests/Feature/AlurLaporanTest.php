@@ -42,11 +42,15 @@ class AlurLaporanTest extends TestCase
 
     private function dataLaporan(array $ubah = []): array
     {
+        // Sub-D.I. tanpa petak tersier → satu baris "seluruh Sub-D.I." (kunci 0)
+        $petak = ($ubah['petak0'] ?? []) + ['jenis_tanaman' => 'P', 'luas_tanam_ha' => 200, 'fase' => 4, 'umur_hst' => 65, 'kecukupan_air' => 'KS', 'luas_kering_ha' => 50];
+        unset($ubah['petak0']);
+
         return $ubah + [
-            'tanggal' => today()->toDateString(), 'sub_daerah_irigasi_id' => $this->subA->id,
-            'debit_intake_lps' => 120.5, 'tma_cm' => 45, 'kondisi_saluran' => 'kurang', 'bukaan_pintu_persen' => 60,
-            'fase_tanaman' => 'generatif', 'luas_tanam_ha' => 200, 'luas_hijau_ha' => 150, 'luas_kering_ha' => 50,
-            'luas_panen_ha' => 0, 'luas_puso_ha' => 0, 'kendala' => 'Debit turun', 'lat' => -10.12, 'lng' => 123.83,
+            'tanggal' => today()->toDateString(), 'jam' => '07:30', 'jenis' => 'rutin', 'sub_daerah_irigasi_id' => $this->subA->id,
+            'cuaca' => 'cerah', 'hujan_7hari' => 'tidak', 'tindakan_operasi' => 'tetap',
+            'petak' => [0 => $petak],
+            'kendala' => 'Debit turun', 'usulan' => 'Normalisasi saluran', 'dokumentasi' => ['papan_duga', 'sawah'], 'lat' => -10.12, 'lng' => 123.83,
         ];
     }
 
@@ -72,8 +76,14 @@ class AlurLaporanTest extends TestCase
         $l = LaporanHarian::first();
         $res->assertRedirect(route('laporan.show', $l));
         $this->assertSame('menunggu', $l->status_verifikasi);
-        $this->assertSame('siaga', $l->status()); // 25% kering
+        $this->assertSame('siaga', $l->status()); // kecukupan air KS (kering sedang)
         $this->assertCount(2, $l->foto);
+        $this->assertSame(['papan_duga', 'sawah'], $l->dokumentasi);
+        $this->assertEquals(200, $l->luas_tanam_ha);
+        $this->assertEquals(50, $l->luas_kering_ha);
+        $this->assertEquals(200, $l->luas_padi_ha);
+        $this->assertSame('KS', $l->petak()->value('kecukupan_air'));
+        $this->assertEquals(275, $l->petak()->value('luas_baku_ha'));   // luas Sub-D.I.
         Storage::disk('uploads')->assertExists($l->foto->first()->path);
         [$w] = getimagesizefromstring(Storage::disk('uploads')->get($l->foto->first()->path));
         $this->assertLessThanOrEqual(1600, $w, 'foto besar diperkecil');
@@ -92,7 +102,9 @@ class AlurLaporanTest extends TestCase
 
     public function test_luas_kering_tidak_boleh_melebihi_luas_tanam(): void
     {
-        $this->actingAs($this->petugas)->post('/laporan', $this->dataLaporan(['luas_kering_ha' => 300]))->assertSessionHasErrors('luas_kering_ha');
+        $this->actingAs($this->petugas)->post('/laporan', $this->dataLaporan(['petak0' => ['luas_kering_ha' => 300]]))->assertSessionHasErrors('petak.0.luas_kering_ha');
+        $this->actingAs($this->petugas)->post('/laporan', $this->dataLaporan(['petak0' => ['kecukupan_air' => '']]))->assertSessionHasErrors('petak.0.kecukupan_air');
+        $this->actingAs($this->petugas)->post('/laporan', $this->dataLaporan(['petak' => []]))->assertSessionHasErrors('petak');
     }
 
     public function test_verifikasi_koordinator_dan_laporan_terkunci(): void
@@ -108,7 +120,7 @@ class AlurLaporanTest extends TestCase
         $this->actingAs($koor)->post(route('laporan.verifikasi', $l), ['keputusan' => 'perbaikan'])->assertSessionHasErrors('catatan_verifikasi');
         $this->actingAs($koor)->post(route('laporan.verifikasi', $l), ['keputusan' => 'perbaikan', 'catatan_verifikasi' => 'Foto kurang'])->assertSessionHasNoErrors();
         // petugas memperbaiki → kembali menunggu
-        $this->actingAs($this->petugas)->put(route('laporan.update', $l), $this->dataLaporan(['debit_intake_lps' => 99]))->assertRedirect();
+        $this->actingAs($this->petugas)->put(route('laporan.update', $l), $this->dataLaporan(['petak0' => ['luas_kering_ha' => 40]]))->assertRedirect();
         $this->assertSame('menunggu', $l->fresh()->status_verifikasi);
 
         $this->actingAs($koor)->post(route('laporan.verifikasi', $l), ['keputusan' => 'disetujui']);
@@ -193,27 +205,26 @@ class AlurLaporanTest extends TestCase
         $this->assertSame('menunggu', $b1->fresh()->status_verifikasi);
     }
 
-    public function test_komoditas_padi_palawija_hortikultura(): void
+    public function test_jenis_tanaman_bera_dan_insidental(): void
     {
-        $data = $this->dataLaporan(['luas_padi_ha' => 0, 'luas_palawija_ha' => 30, 'jenis_palawija' => 'Jagung, Kacang hijau',
-            'luas_horti_ha' => 5, 'jenis_horti' => 'Cabai', 'luas_tanam_ha' => 999, 'luas_hijau_ha' => 30, 'luas_kering_ha' => 5]);
-        $this->actingAs($this->petugas)->post('/laporan', $data)->assertSessionHasNoErrors();
-
+        // palawija (jagung) dengan air kurang → Waspada
+        $this->actingAs($this->petugas)->post('/laporan', $this->dataLaporan(['petak0' => ['jenis_tanaman' => 'J', 'luas_tanam_ha' => 30, 'kecukupan_air' => 'KR', 'luas_kering_ha' => 0, 'fase' => 6]]))
+            ->assertSessionHasNoErrors();
         $l = LaporanHarian::firstOrFail();
-        $this->assertEquals(35, $l->luas_tanam_ha);                         // dihitung ulang server: 0 + 30 + 5
-        $this->assertSame('Jagung, Kacang hijau', $l->jenis_palawija);
-        $this->assertSame('Palawija 30 Ha (Jagung, Kacang hijau) · Hortikultura 5 Ha (Cabai)', $l->ringkasKomoditas());
-        $this->actingAs($this->petugas)->get(route('laporan.show', $l))->assertSee('Kacang hijau');
+        $this->assertSame('waspada', $l->status());
+        $this->assertSame('Palawija 30 Ha (Jagung)', $l->ringkasKomoditas());
+        $this->assertEquals(30, $l->luas_panen_ha);                       // fase 6 = sudah panen
+        $this->actingAs($this->petugas)->get(route('laporan.show', $l))->assertOk()->assertSee('KR · Kurang')->assertSee('Rutin (Senin)');
 
-        // kekeringan tidak boleh melebihi total komoditas
-        $this->actingAs($this->petugas)->put(route('laporan.update', $l), array_merge($data, ['luas_kering_ha' => 40]))
-            ->assertSessionHasErrors('luas_kering_ha');
-
-        // jenis dikosongkan bila luasnya 0; form lama tanpa rincian → seluruhnya padi
-        $this->actingAs($this->petugas)->put(route('laporan.update', $l), array_merge($data, ['luas_horti_ha' => 0]))->assertSessionHasNoErrors();
-        $this->assertNull($l->fresh()->jenis_horti);
-        $lama = $this->dataLaporan(['tanggal' => today()->subDay()->toDateString()]);
-        $this->actingAs($this->petugas)->post('/laporan', $lama)->assertSessionHasNoErrors();
-        $this->assertEquals(200, LaporanHarian::whereDate('tanggal', today()->subDay())->value('luas_padi_ha'));
+        // insidental wajib alasan
+        $kemarin = today()->subDay()->toDateString();
+        $this->actingAs($this->petugas)->post('/laporan', $this->dataLaporan(['tanggal' => $kemarin, 'jenis' => 'insidental']))->assertSessionHasErrors('alasan');
+        // bera: tanpa luas/fase/kecukupan, status Aman
+        $this->actingAs($this->petugas)->post('/laporan', $this->dataLaporan(['tanggal' => $kemarin, 'jenis' => 'insidental', 'alasan' => 'panen',
+            'petak0' => ['jenis_tanaman' => 'B', 'luas_tanam_ha' => '', 'fase' => '', 'kecukupan_air' => '', 'luas_kering_ha' => '']]))->assertSessionHasNoErrors();
+        $bera = LaporanHarian::whereDate('tanggal', $kemarin)->firstOrFail();
+        $this->assertSame('aman', $bera->status());
+        $this->assertEquals(0, $bera->luas_tanam_ha);
+        $this->assertSame('Insidental · Panen', $bera->jenis_label);
     }
 }

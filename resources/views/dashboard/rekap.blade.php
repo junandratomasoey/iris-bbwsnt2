@@ -64,7 +64,7 @@
     <section class="panel p-5">
         <h2 class="text-lg font-semibold">Kepatuhan lapor</h2>
         <p class="mt-2 font-gauge text-4xl font-semibold">{{ $r['total']['kepatuhan'] }}<span class="text-xl text-basalt-mute">%</span></p>
-        <p class="text-sm text-basalt-soft">{{ angka($r['total']['laporan']) }} laporan dari {{ angka($r['total']['jumlah_sub'] * $r['jumlah_hari']) }} hari-Sub-D.I.</p>
+        <p class="text-sm text-basalt-soft">{{ angka($r['total']['laporan']) }} laporan PPA · pekan yang ada laporan dari {{ angka($r['total']['jumlah_sub'] * $r['total']['jumlah_minggu']) }} pekan-Sub-D.I. (rutin tiap Senin)</p>
         <ul class="mt-4 space-y-2.5">
             @foreach($r['kepatuhan'] as $k)
                 <li>
@@ -93,7 +93,7 @@
             <div class="flex items-baseline justify-between"><dt class="text-sm text-basalt-soft">Puso</dt><dd class="font-gauge text-2xl font-semibold text-status-kritis">{{ angka($r['total']['puncak_puso_ha'], 1) }} Ha</dd></div>
             <div class="flex items-baseline justify-between"><dt class="text-sm text-basalt-soft">Panen</dt><dd class="font-gauge text-2xl font-semibold text-status-aman">{{ angka($r['total']['puncak_panen_ha'], 1) }} Ha</dd></div>
         </dl>
-        <p class="mt-3 text-xs text-basalt-mute">Nilai tertinggi yang dilaporkan tiap Sub-D.I. selama periode, lalu dijumlah. Laporan harian tidak dijumlah antar hari agar luas tidak terhitung berulang.</p>
+        <p class="mt-3 text-xs text-basalt-mute">Nilai tertinggi yang dilaporkan tiap Sub-D.I. selama periode, lalu dijumlah. Laporan tidak dijumlah antar pekan agar luas tidak terhitung berulang.</p>
     </section>
 
     <section class="panel p-5">

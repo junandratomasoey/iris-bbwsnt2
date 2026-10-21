@@ -3,12 +3,11 @@
 namespace App\Services;
 
 use App\Models\DaerahIrigasi;
+use App\Models\LaporanPetak;
 use App\Models\PembacaanPintu;
 use App\Models\PintuAir;
 use App\Models\SesiPintu;
-use App\Models\LaporanHarian;
 use App\Models\User;
-use App\Support\StatusKondisi;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -153,10 +152,10 @@ class PintuService
         }
 
         $tersier = $pintu->where('tingkat', 'tersier')->values();
-        $laporan = LaporanHarian::whereIn('pintu_air_id', $tersier->pluck('id'))
-            ->whereBetween('tanggal', [$senin->toDateString(), $akhir->toDateString()])
-            ->where('status_verifikasi', '!=', 'perbaikan')
-            ->orderBy('tanggal')->orderBy('id')->get()->keyBy('pintu_air_id');
+        // kondisi tanaman tiap petak dari laporan PPA pekan itu (baris petak terakhir per pintu tersier)
+        $laporan = LaporanPetak::with('laporan:id,tanggal')->whereIn('pintu_air_id', $tersier->pluck('id'))
+            ->whereHas('laporan', fn ($q) => $q->whereBetween('tanggal', [$senin->toDateString(), $akhir->toDateString()])->where('status_verifikasi', '!=', 'perbaikan'))
+            ->get()->sortBy(fn ($b) => [$b->laporan->tanggal->toDateString(), $b->laporan_harian_id])->keyBy('pintu_air_id');
         $berdata = $tersier->filter(fn ($p) => $p->luas_layanan_ha > 0 && $debit($p->id) !== null);
         $luas = $berdata->sum('luas_layanan_ha');
         $rata = $luas > 0 ? $berdata->sum(fn ($p) => $debit($p->id)) / $luas : null;
@@ -172,7 +171,8 @@ class PintuService
                 'persen_rencana' => $d !== null && $p->debit_rencana_lps > 0 ? (int) round($d / $p->debit_rencana_lps * 100) : null,
                 'rasio' => $q !== null && $rata ? (int) round($q / $rata * 100) : null,
                 'status_debit' => $p->statusDebit($d),
-                'laporan' => $l, 'status_lahan' => $l ? StatusKondisi::dariLaporan($l) : null,
+                'laporan' => $l?->laporan, 'status_lahan' => $l ? ($l->status ?? $l->hitungStatus()) : null,
+                'petak' => $l,
             ];
         })->sortBy(fn ($r) => [$r['rasio'] === null ? 1 : 0, $r['rasio'] ?? 0])->values()->all();
 

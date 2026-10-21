@@ -1,5 +1,6 @@
 /**
- * Form laporan harian petugas: draf tersimpan di HP, GPS otomatis,
+ * Form laporan PPA (format pengisian PPA): pembacaan pintu & kondisi tanaman per petak tersier.
+ * Draf tersimpan di HP, GPS otomatis,
  * foto dikompres di browser sebelum dikirim (hemat kuota & sinyal).
  */
 import L from 'leaflet';
@@ -17,26 +18,38 @@ export function laporanForm(opsi) {
 
     return {
         titikSub: opsi.titikSub || {},
+        infoSub: opsi.infoSub || {},
         lokasi: opsi.awal.lat ? 'tersimpan' : null, // gps | peta | ketik | tersimpan
         petaBuka: false,
         baru: !!opsi.baru,
         sisaFoto: opsi.sisaFoto ?? MAKS_FOTO,
-        luasSub: opsi.luasSub || {},
         petakSub: opsi.petakSub || {},
         pintuSub: opsi.pintuSub || {},
-        /** Pintu yang ditampilkan: petak yang dilaporkan + pintu tugas saya (bila tidak ada tugas: semua yang boleh diisi). */
+        sebelumnya: opsi.sebelumnya || {},
+        statusKecukupan: opsi.statusKecukupan || {},
+        tampilPintuLain: false,
+        tampilPetakLain: false,
+        wajibBaca: opsi.wajibBaca !== false,
+
+        get info() { return this.infoSub[this.f.sub_daerah_irigasi_id] || null; },
+        get sebelumnyaSub() { return this.baru ? (this.sebelumnya[this.f.sub_daerah_irigasi_id] || null) : null; },
+        get senin() { return !!this.f.tanggal && new Date(this.f.tanggal + 'T00:00:00').getDay() === 1; },
+
+        // ---------- B. pintu ----------
+        get semuaPintu() { return this.pintuSub[this.f.sub_daerah_irigasi_id] || []; },
+        baca(id) {
+            if (!this.f.baca[id]) this.f.baca[id] = { tma: '', bukaan: '', debit: '', kondisi_pintu: '', kondisi_saluran: '', catatan: '' };
+            return this.f.baca[id];
+        },
+        terisiPintu(id) { const v = this.f.baca[id]; return !!v && Object.values(v).some((x) => x !== '' && x !== null); },
+        /** Pintu tugas saya + yang sudah diisi; bila tidak ada tugas: semua pintu yang boleh diisi. */
         get daftarPintu() {
-            const semua = this.pintuSub[this.f.sub_daerah_irigasi_id] || [];
-            const ada = semua.some((p) => p.saya);
-            const isi = (id) => { const v = this.f.baca?.[id]; return !!v && (v.debit !== '' || v.tma !== ''); };
-            return semua.filter((p) => !ada || p.saya || String(p.id) === String(this.f.pintu_air_id) || isi(p.id))
-                .sort((a, b) => (String(b.id) === String(this.f.pintu_air_id)) - (String(a.id) === String(this.f.pintu_air_id)));
+            const ada = this.semuaPintu.some((p) => p.saya);
+            return this.semuaPintu.filter((p) => !ada || p.saya || this.tampilPintuLain || this.terisiPintu(p.id));
         },
-        nilaiPintu(id) {
-            return this.f.baca[id] || { debit: '', tma: '' };
-        },
+        get pintuLain() { return this.semuaPintu.some((p) => p.saya) ? this.semuaPintu.filter((p) => !p.saya && !this.terisiPintu(p.id)).length : 0; },
         statusPintu(p, k) {
-            const v = this.nilaiPintu(p.id)[k];
+            const v = this.baca(p.id)[k];
             if (v === '' || v === null || isNaN(+v)) return null;
             const [min, maks] = k === 'debit' ? [p.dmin, p.dmaks] : [p.tmin, p.tmaks];
             if (min === null && maks === null) return null;
@@ -46,9 +59,60 @@ export function laporanForm(opsi) {
         },
         teksPintu(s) { return { bawah: '▼ di bawah normal', atas: '▲ di atas normal', normal: '✓ normal' }[s] || ''; },
         warnaPintu(s) { return { bawah: 'text-[#8A3510]', atas: 'text-[#1B4F7A]', normal: 'text-[#2F5A19]' }[s] || ''; },
-        get daftarPetak() { return this.petakSub[this.f.sub_daerah_irigasi_id]?.daftar || []; },
-        get petakWajib() { return !!this.petakSub[this.f.sub_daerah_irigasi_id]?.wajib; },
-        get petakTerpilih() { return this.daftarPetak.find((p) => String(p.id) === String(this.f.pintu_air_id)) || null; },
+
+        // ---------- C. petak ----------
+        get semuaPetak() { return this.petakSub[this.f.sub_daerah_irigasi_id]?.daftar || []; },
+        petak(id) {
+            if (!this.f.petak[id]) this.f.petak[id] = { luas_tanam_ha: '', jenis_tanaman: '', fase: '', umur_hst: '', kecukupan_air: '', luas_kering_ha: '', keterangan: '' };
+            return this.f.petak[id];
+        },
+        terisiPetak(id) { return !!this.f.petak[id]?.jenis_tanaman; },
+        get daftarPetak() {
+            const ada = this.semuaPetak.some((p) => p.saya);
+            return this.semuaPetak.filter((p) => !ada || p.saya || this.tampilPetakLain || this.terisiPetak(p.id));
+        },
+        get petakLain() { return this.semuaPetak.some((p) => p.saya) ? this.semuaPetak.filter((p) => !p.saya && !this.terisiPetak(p.id)).length : 0; },
+        statusPetak(id) {
+            const r = this.f.petak[id];
+            if (!r || !r.jenis_tanaman) return null;
+            if (r.kecukupan_air) return this.statusKecukupan[r.kecukupan_air] || null;
+            return r.jenis_tanaman === 'B' ? 'aman' : null;
+        },
+        peringatanLuas(p) {
+            const r = this.f.petak[p.id];
+            if (!r) return null;
+            if (p.luas && +r.luas_tanam_ha > p.luas * 1.05) return `Luas tanam melebihi luas baku petak (${p.luas.toLocaleString('id-ID')} Ha). Periksa kembali.`;
+            if (+r.luas_kering_ha > +r.luas_tanam_ha) return 'Luas terdampak kering melebihi luas tanam.';
+            return null;
+        },
+        get ringkas() {
+            const isi = this.semuaPetak.map((p) => this.f.petak[p.id]).filter((r) => r && r.jenis_tanaman);
+            const tanam = isi.filter((r) => r.jenis_tanaman !== 'B');
+            return {
+                jumlah: isi.length,
+                tanam: tanam.reduce((t, r) => t + (+r.luas_tanam_ha || 0), 0),
+                kering: tanam.reduce((t, r) => t + (+r.luas_kering_ha || 0), 0),
+            };
+        },
+        get statusPratinjau() {
+            const urut = { kosong: 0, aman: 1, waspada: 2, siaga: 3, kritis: 4 };
+            return this.semuaPetak.map((p) => this.statusPetak(p.id)).filter(Boolean)
+                .reduce((a, b) => (urut[b] > urut[a] ? b : a), 'kosong');
+        },
+        /** Laporan baru: salin jenis/fase/umur/luas dari laporan sebelumnya pelapor ini untuk petak yang masih kosong. */
+        salinSebelumnya() {
+            const s = this.sebelumnyaSub;
+            if (!s) return;
+            Object.entries(s.petak || {}).forEach(([id, r]) => {
+                const t = this.petak(id);
+                if (t.jenis_tanaman) return;
+                t.jenis_tanaman = r.jenis_tanaman || '';
+                t.fase = r.fase === null || r.fase === undefined ? '' : String(r.fase);
+                t.umur_hst = r.umur_hst === null || r.umur_hst === undefined ? '' : String(r.umur_hst);
+                t.luas_tanam_ha = r.luas_tanam_ha ? String(r.luas_tanam_ha) : '';
+            });
+            if (!this.f.tindakan_operasi && s.tindakan_operasi) this.f.tindakan_operasi = s.tindakan_operasi;
+        },
 
         f: opsi.awal,
         foto: [],          // {file, url, ukuran}
@@ -59,29 +123,7 @@ export function laporanForm(opsi) {
         kirim: false,
         pesanOffline: false,
 
-        get kunciDraf() { return `iris-draf-laporan-${this.f.sub_daerah_irigasi_id || 'x'}-${this.f.pintu_air_id || 0}`; },
-        pakai: { padi: false, palawija: false, horti: false },
-        /** total = padi + palawija + hortikultura yang dicentang */
-        get luasTanam() {
-            return Math.round(['padi', 'palawija', 'horti'].reduce((t, k) => t + (this.pakai[k] ? (+this.f[`luas_${k}_ha`] || 0) : 0), 0) * 100) / 100;
-        },
-        daftarJenis(k) { return String(this.f[`jenis_${k}`] || '').split(',').map((x) => x.trim()).filter(Boolean); },
-        adaJenis(k, j) { return this.daftarJenis(k).some((x) => x.toLowerCase() === j.toLowerCase()); },
-        pilihJenis(k, j) {
-            const d = this.daftarJenis(k);
-            this.f[`jenis_${k}`] = (this.adaJenis(k, j) ? d.filter((x) => x.toLowerCase() !== j.toLowerCase()) : [...d, j]).join(', ');
-        },
-        get statusPratinjau() {
-            const t = this.luasTanam;
-            const rk = t > 0 ? (+this.f.luas_kering_ha || 0) / t : 0;
-            if ((+this.f.luas_puso_ha || 0) > 0 || rk >= 0.5) return 'kritis';
-            // laporan tanaman PPA tidak berisi kondisi saluran → dasar Aman, dinilai dari tanaman
-            let s = { penuh: 'aman', normal: 'aman', kurang: 'waspada', kering: 'siaga' }[this.f.kondisi_saluran] || 'aman';
-            const urut = { kosong: 0, aman: 1, waspada: 2, siaga: 3, kritis: 4 };
-            const naik = (a, b) => (urut[a] >= urut[b] ? a : b);
-            if (rk >= 0.25) s = naik(s, 'siaga'); else if (rk >= 0.1) s = naik(s, 'waspada');
-            return s;
-        },
+        get kunciDraf() { return `iris-draf-laporan-${this.f.sub_daerah_irigasi_id || 'x'}`; },
         get latValid() { const v = String(this.f.lat ?? '').trim(); return !v || (ANGKA.test(v) && +v >= -12 && +v <= -7); },
         get lngValid() { const v = String(this.f.lng ?? '').trim(); return !v || (ANGKA.test(v) && +v >= 118 && +v <= 126); },
         get koordinatValid() { return this.latValid && this.lngValid && !!this.f.lat === !!this.f.lng; },
@@ -94,27 +136,18 @@ export function laporanForm(opsi) {
             if (!this.f.lat) return 'Belum ada titik (boleh dikosongkan).';
             return { gps: `Dari GPS HP${this.gps.akurasi ? ` (±${this.gps.akurasi} m)` : ''}`, peta: 'Dipilih di peta', ketik: 'Diketik manual', tersimpan: 'Titik tersimpan' }[this.lokasi] || '';
         },
-        get peringatanLuas() {
-            const petak = this.petakTerpilih?.luas;
-            if (petak && this.luasTanam > petak * 1.05) return `Luas tanam melebihi luas layanan petak (${petak.toLocaleString('id-ID')} Ha). Periksa kembali.`;
-            const luas = this.luasSub[this.f.sub_daerah_irigasi_id];
-            if (luas && this.luasTanam > luas * 1.05) return `Luas tanam melebihi luas Sub-D.I. (${luas.toLocaleString('id-ID')} Ha). Periksa kembali.`;
-            return null;
-        },
 
         init() {
-            // siapkan isian debit/TMA untuk semua pintu yang bisa diisi (agar x-model tidak mengubah state saat render)
+            // siapkan isian untuk semua pintu & petak (agar x-model tidak mengubah state saat render)
             if (!this.f.baca || Array.isArray(this.f.baca)) this.f.baca = {};
-            Object.values(this.pintuSub).flat().forEach((p) => { if (!this.f.baca[p.id]) this.f.baca[p.id] = { debit: '', tma: '' }; });
-            // komoditas aktif = yang luasnya terisi; laporan baru tanpa angka → padi
-            ['padi', 'palawija', 'horti'].forEach((k) => { this.pakai[k] = (+this.f[`luas_${k}_ha`] || 0) > 0; });
-            if (!this.pakai.palawija && !this.pakai.horti && !this.pakai.padi && (this.baru || +this.f.luas_tanam_ha > 0)) this.pakai.padi = true;
-            if (this.pakai.padi && !(+this.f.luas_padi_ha) && +this.f.luas_tanam_ha > 0) this.f.luas_padi_ha = this.f.luas_tanam_ha;
-            this.$watch('f.sub_daerah_irigasi_id', () => {
-                if (this.f.pintu_air_id && !this.petakTerpilih) this.f.pintu_air_id = '';
-                if (!this.f.pintu_air_id && this.daftarPetak.length === 1) this.f.pintu_air_id = String(this.daftarPetak[0].id);
-            });
-            if (!this.f.pintu_air_id && this.daftarPetak.length === 1) this.f.pintu_air_id = String(this.daftarPetak[0].id);
+            if (!this.f.petak || Array.isArray(this.f.petak)) this.f.petak = {};
+            if (!Array.isArray(this.f.dokumentasi)) this.f.dokumentasi = [];
+            Object.values(this.pintuSub).flat().forEach((p) => this.baca(p.id));
+            Object.values(this.petakSub).forEach((s) => (s.daftar || []).forEach((p) => this.petak(p.id)));
+            if (this.baru) {
+                this.salinSebelumnya();
+                this.$watch('f.sub_daerah_irigasi_id', () => this.salinSebelumnya());
+            }
             window.addEventListener('online', () => (this.online = true));
             window.addEventListener('offline', () => (this.online = false));
             if (opsi.hapusDraf) this.hapusDraf();
@@ -122,7 +155,6 @@ export function laporanForm(opsi) {
                 try { this.adaDraf = !!localStorage.getItem(this.kunciDraf); } catch (e) {}
                 this.$watch('f', () => this.simpanDraf(), { deep: true });
                 this.$watch('f.sub_daerah_irigasi_id', () => { try { this.adaDraf = !!localStorage.getItem(this.kunciDraf); } catch (e) {} });
-                this.$watch('f.pintu_air_id', () => { try { this.adaDraf = !!localStorage.getItem(this.kunciDraf); } catch (e) {} });
                 if (!this.f.lat) this.ambilGps(true);
             }
             this.$watch('f.lat', () => this.pasangPenanda());
@@ -139,7 +171,6 @@ export function laporanForm(opsi) {
                 if (d) {
                     delete d._waktu;
                     Object.assign(this.f, d);
-                    ['padi', 'palawija', 'horti'].forEach((k) => { this.pakai[k] = (+this.f[`luas_${k}_ha`] || 0) > 0; });
                 }
             } catch (e) {}
             this.adaDraf = false;
@@ -189,8 +220,8 @@ export function laporanForm(opsi) {
             this.$nextTick(() => {
                 if (!peta) {
                     const ada = this.f.lat && this.f.lng && dalamNtt(+this.f.lat, +this.f.lng);
-                    const pt = this.petakTerpilih;
-                    const sub = pt?.lat ? [pt.lat, pt.lng] : this.titikSub[this.f.sub_daerah_irigasi_id];
+                    const pt = this.daftarPetak.find((p) => p.lat);
+                    const sub = pt ? [pt.lat, pt.lng] : this.titikSub[this.f.sub_daerah_irigasi_id];
                     const pusat = ada ? [+this.f.lat, +this.f.lng] : (sub ? [sub[0], sub[1]] : [-9.6, 122.0]);
                     peta = L.map(this.$refs.petaLokasi, { scrollWheelZoom: false }).setView(pusat, ada ? 16 : (sub ? 14 : 7));
                     L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: 'Esri' }).addTo(peta);

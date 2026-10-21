@@ -98,6 +98,14 @@
                             <span class="mt-1 block h-4 text-xs font-semibold" :class="warna(statusTma({{ $p->id }}))" x-text="teks(statusTma({{ $p->id }}))"></span></label>
                         <label class="lg:col-span-2"><span class="label">Bukaan (cm)</span>
                             <input type="number" step="any" min="0" inputmode="decimal" name="baca[{{ $p->id }}][bukaan]" x-model="nilai[{{ $p->id }}].bukaan" class="input"></label>
+                        <label class="lg:col-span-2"><span class="label">Kondisi pintu</span>
+                            <select name="baca[{{ $p->id }}][kondisi_pintu]" class="input"><option value="">–</option>
+                                @foreach(\App\Support\KodeIsian::KONDISI_PINTU as $k => $l)<option value="{{ $k }}" @selected(($nilai[$p->id]['kondisi_pintu'] ?? null) === $k)>{{ $k }} · {{ $l }}</option>@endforeach
+                            </select></label>
+                        <label class="lg:col-span-2"><span class="label">Kondisi saluran</span>
+                            <select name="baca[{{ $p->id }}][kondisi_saluran]" class="input"><option value="">–</option>
+                                @foreach(\App\Support\KodeIsian::KONDISI_SALURAN as $k => $l)<option value="{{ $k }}" @selected(($nilai[$p->id]['kondisi_saluran'] ?? null) === $k)>{{ $k }} · {{ $l }}</option>@endforeach
+                            </select></label>
                         <label class="lg:col-span-3"><span class="label">Catatan</span>
                             <input name="baca[{{ $p->id }}][catatan]" x-model="nilai[{{ $p->id }}].catatan" maxlength="255" class="input" placeholder="mis. pintu macet, sampah"></label>
                     </li>

@@ -9,9 +9,12 @@ use App\Models\SesiPintu;
 use App\Models\User;
 use App\Services\FotoService;
 use App\Services\PintuService;
+use App\Support\KodeIsian;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Pembacaan debit & TMA pintu air. Satu kiriman = satu kunjungan (sesi) ke satu D.I.
@@ -176,6 +179,8 @@ class PembacaanPintuController extends Controller
                 'tma' => old("baca.{$p->id}.tma", $b?->tma_cm),
                 'bukaan' => old("baca.{$p->id}.bukaan", $b?->bukaan_cm),
                 'catatan' => old("baca.{$p->id}.catatan", $b?->catatan),
+                'kondisi_pintu' => old("baca.{$p->id}.kondisi_pintu", $b?->kondisi_pintu),
+                'kondisi_saluran' => old("baca.{$p->id}.kondisi_saluran", $b?->kondisi_saluran),
             ];
         }
 
@@ -197,6 +202,8 @@ class PembacaanPintuController extends Controller
             'baca.*.tma' => ['nullable', 'numeric', 'min:0', 'max:10000'],
             'baca.*.bukaan' => ['nullable', 'numeric', 'min:0', 'max:10000'],
             'baca.*.catatan' => ['nullable', 'string', 'max:255'],
+            'baca.*.kondisi_pintu' => ['nullable', Rule::in(array_keys(KodeIsian::KONDISI_PINTU))],
+            'baca.*.kondisi_saluran' => ['nullable', Rule::in(array_keys(KodeIsian::KONDISI_SALURAN))],
             'baca.*.lat' => ['nullable', 'required_with:baca.*.lng', 'numeric', 'between:-12,-7'],
             'baca.*.lng' => ['nullable', 'required_with:baca.*.lat', 'numeric', 'between:118,126'],
             'baca.*.akurasi' => ['nullable', 'numeric', 'min:0', 'max:100000'],
@@ -231,11 +238,11 @@ class PembacaanPintuController extends Controller
             }
         }
         if (! $baris && ! $titik) {
-            throw \Illuminate\Validation\ValidationException::withMessages(['baca' => 'Isi debit atau TMA minimal satu pintu.']);
+            throw ValidationException::withMessages(['baca' => 'Isi debit atau TMA minimal satu pintu.']);
         }
         $this->simpanTitik($u, $titik);
         if (! $baris) {
-            throw new \Illuminate\Http\Exceptions\HttpResponseException(
+            throw new HttpResponseException(
                 redirect()->route('pintu.index', ['di' => $diId])->with('ok', count($titik).' titik pintu disimpan (tanpa pembacaan).'));
         }
 
@@ -269,6 +276,7 @@ class PembacaanPintuController extends Controller
                 'pintu_air_id' => $id, 'tanggal' => $sesi->tanggal,
                 'debit_lps' => $angka($r['debit'] ?? null), 'tma_cm' => $angka($r['tma'] ?? null), 'bukaan_cm' => $angka($r['bukaan'] ?? null),
                 'catatan' => $r['catatan'] ?? null,
+                'kondisi_pintu' => ($r['kondisi_pintu'] ?? null) ?: null, 'kondisi_saluran' => ($r['kondisi_saluran'] ?? null) ?: null,
             ]);
         }
     }
@@ -282,8 +290,8 @@ class PembacaanPintuController extends Controller
     /** Pengisi sendiri selama belum lewat batas ubah, atau pengelola pintu D.I. tersebut. */
     private function bolehUbah(User $u, SesiPintu $sesi): bool
     {
-        if ($sesi->laporan_harian_id) {
-            return false; // diubah lewat laporan harian tanaman-nya
+        if ($sesi->dariLaporan()) {
+            return false; // diubah lewat laporan PPA / Manager Air-nya
         }
 
         $diIds = $u->diIdsTerjangkau();

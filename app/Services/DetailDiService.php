@@ -8,6 +8,7 @@ use App\Models\Kejadian;
 use App\Models\LaporanAir;
 use App\Models\LaporanHarian;
 use App\Models\P3a;
+use App\Support\KodeIsian;
 use App\Support\Periode;
 use App\Support\StatusKondisi;
 use Carbon\Carbon;
@@ -83,11 +84,11 @@ class DetailDiService
         $dari = $sampai->copy()->subDays(self::HARI - 1);
         $laporan = $this->laporanBerfoto($subIds, $internal)
             ->whereBetween('tanggal', [$dari->toDateString(), $sampai->toDateString()])
-            ->with(['foto', 'subDaerahIrigasi:id,nama', 'user:id,name', 'petak:id,kode'])
+            ->with(['foto', 'subDaerahIrigasi:id,nama', 'user:id,name', 'petak.pintu:id,kode'])
             ->orderByDesc('tanggal')->orderBy('sub_daerah_irigasi_id')->get();
         // laporan air Manager (sungai, intake, saluran) yang berfoto ikut tampil per tanggal, di urutan pertama
         $air = $diId ? LaporanAir::where('daerah_irigasi_id', $diId)->whereHas('foto')
-            ->whereBetween('tanggal', [$dari->toDateString(), $sampai->toDateString()])->with('foto', 'user:id,name')->get() : collect();
+            ->whereBetween('tanggal', [$dari->toDateString(), $sampai->toDateString()])->with('foto', 'user:id,name', 'sesiPintu.pembacaan')->get() : collect();
         $laporan = $air->concat($laporan)->sortByDesc(fn ($l) => $l->tanggal->toDateString())->values();
 
         $grup = $laporan->groupBy(fn ($l) => $l->tanggal->toDateString())->map(function ($daftar, $tgl) use ($internal) {
@@ -100,12 +101,12 @@ class DetailDiService
                 'laporan' => $daftar->map(function ($l) use ($internal, $t) {
                     $st = $l->status();
                     if ($l instanceof LaporanAir) {
-                        $label = 'Air sungai, intake & saluran';
+                        $label = 'Laporan Manager Air · bendung, intake & saluran primer';
 
                         return [
                             'id' => 'air-'.$l->id, 'sub' => $label,
                             'status' => $st, 'status_label' => StatusKondisi::label($st), 'warna' => StatusKondisi::WARNA[$st],
-                            'kondisi' => LaporanHarian::KONDISI[$l->kondisi_saluran] ?? $l->kondisi_saluran,
+                            'kondisi' => $l->ringkasKondisi(),
                             'fase' => null, 'komoditas' => null, 'kendala' => $l->catatan, 'terverifikasi' => null,
                             'foto' => $l->foto->map(fn ($f) => ['kecil' => $f->url_kecil, 'besar' => $f->url, 'label' => $label.' · '.$t->translatedFormat('d M Y')])->values(),
                         ] + ($internal ? [
@@ -116,10 +117,10 @@ class DetailDiService
 
                     return [
                         'id' => $l->id,
-                        'sub' => $l->subDaerahIrigasi?->nama.($l->petak ? ' · Petak '.$l->petak->kode : ''),
+                        'sub' => $l->subDaerahIrigasi?->nama.(($k = $l->petak->pluck('pintu.kode')->filter()->implode(', ')) ? ' · Petak '.$k : ''),
                         'status' => $st, 'status_label' => StatusKondisi::label($st), 'warna' => StatusKondisi::WARNA[$st],
-                        'kondisi' => LaporanHarian::KONDISI[$l->kondisi_saluran] ?? $l->kondisi_saluran,
-                        'fase' => LaporanHarian::FASE[$l->fase_tanaman] ?? null,
+                        'kondisi' => LaporanHarian::KONDISI[$l->kondisi_saluran] ?? null,
+                        'fase' => $l->ringkasFase(),
                         'komoditas' => $l->ringkasKomoditas(),
                         'kendala' => $l->kendala,
                         'terverifikasi' => $l->status_verifikasi === 'disetujui',
@@ -148,7 +149,7 @@ class DetailDiService
     }
 
     /**
-     * Status D.I. per hari (laporan berlaku ≤ 3 hari, sama dengan rekap & peta), dikelompokkan
+     * Status D.I. per hari (laporan berlaku ≤ 7 hari, sama dengan rekap & peta), dikelompokkan
      * per minggu bila rentang > 62 hari. "tanggal" = hari terakhir berfoto dalam kelompok (untuk lompat ke foto).
      */
     private function riwayat(array $subIds, Carbon $dari, Carbon $sampai, ?int $diId = null): array
@@ -170,7 +171,7 @@ class DetailDiService
                 $hari[$t]['foto'] += $l->foto_count;
             }
         }
-        foreach ($laporan->groupBy(fn ($l) => $l->sub_daerah_irigasi_id.':'.$l->petak_kunci) as $baris) { // per Sub-D.I. / petak tersier
+        foreach ($laporan->groupBy(fn ($l) => $l->sub_daerah_irigasi_id.':'.$l->user_id) as $baris) { // per Sub-D.I. / PPA
             $baris = $baris->values();
             $k = -1;
             foreach (array_keys($hari) as $t) {
@@ -241,7 +242,7 @@ class DetailDiService
     {
         $a = LaporanAir::where('daerah_irigasi_id', $di->id)
             ->whereBetween('tanggal', [$tgl->copy()->subDays(StatusKondisi::MASA_BERLAKU_HARI - 1)->toDateString(), $tgl->toDateString()])
-            ->latest('tanggal')->latest('id')->first();
+            ->with('sesiPintu.pembacaan')->latest('tanggal')->latest('id')->first();
         if (! $a) {
             return null;
         }
@@ -249,11 +250,12 @@ class DetailDiService
 
         return [
             'tanggal' => $a->tanggal->translatedFormat('d M Y'),
-            'kondisi' => LaporanHarian::KONDISI[$a->kondisi_saluran] ?? $a->kondisi_saluran,
+            'kondisi' => $a->ringkasKondisi(),
             'status' => $st, 'status_label' => StatusKondisi::label($st), 'warna' => StatusKondisi::WARNA[$st],
         ] + ($internal ? [
             'debit_sungai' => $a->debit_sungai_m3s, 'tma_sungai' => $a->tma_sungai_cm,
-            'debit_intake' => $a->debit_intake_lps, 'tma_intake' => $a->tma_intake_cm, 'bukaan' => $a->bukaan_pintu_persen,
+            'debit_intake' => $a->debit_intake_lps, 'tma_intake' => $a->tma_intake_cm, 'bukaan' => $a->bukaan_intake_cm,
+            'pemberian' => KodeIsian::PEMBERIAN_AIR[$a->status_pemberian] ?? null,
             'catatan' => $a->catatan, 'url' => route('laporan-air.show', $a),
         ] : []);
     }
@@ -267,14 +269,16 @@ class DetailDiService
             'status' => $st, 'status_label' => StatusKondisi::label($st), 'warna' => StatusKondisi::WARNA[$st],
             'laporan' => $l ? [
                 'tanggal' => $l->tanggal->translatedFormat('d M Y'),
-                'kondisi' => LaporanHarian::KONDISI[$l->kondisi_saluran] ?? $l->kondisi_saluran,
-                'fase' => LaporanHarian::FASE[$l->fase_tanaman] ?? null,
+                'kondisi' => LaporanHarian::KONDISI[$l->kondisi_saluran] ?? null,
+                'fase' => $l->ringkasFase(),
+                'kekurangan_air' => (int) $l->getAttribute('kekurangan_air'),
                 'komoditas' => $l->ringkasKomoditas(),
                 'tanam' => (float) $l->luas_tanam_ha, 'kering' => (float) $l->luas_kering_ha, 'puso' => (float) $l->luas_puso_ha,
                 'petak' => collect($l->getAttribute('petak_rinci') ?? [])->map(fn ($r) => [
                     'kode' => $r['kode'], 'nama' => $r['nama'], 'status' => $r['status'], 'status_label' => StatusKondisi::label($r['status']), 'warna' => StatusKondisi::WARNA[$r['status']],
                     'tanam' => $r['tanam'], 'kering' => $r['kering'], 'puso' => $r['puso'],
-                    'tanggal' => \Carbon\Carbon::parse($r['tanggal'])->translatedFormat('d M'),
+                    'jenis' => $r['jenis'], 'fase' => $r['fase'], 'umur' => $r['umur'], 'kecukupan' => $r['kecukupan'], 'kecukupan_label' => $r['kecukupan_label'],
+                    'tanggal' => Carbon::parse($r['tanggal'])->translatedFormat('d M'),
                 ] + ($internal ? ['debit' => $r['debit'], 'url' => route('laporan.show', $r['laporan_id'])] : []))->values(),
             ] + ($internal ? ['debit' => $l->debit_intake_lps === null ? null : (float) $l->debit_intake_lps, 'tma' => $l->tma_cm === null ? null : (float) $l->tma_cm, 'url' => route('laporan.show', $l)] : []) : null,
         ] + ($internal ? [

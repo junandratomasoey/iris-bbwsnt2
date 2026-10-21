@@ -5,7 +5,8 @@ namespace App\Support;
 use App\Models\LaporanHarian;
 
 /**
- * Status kondisi tahap 1 (aturan sederhana dari laporan harian).
+ * Status kondisi tahap 1. Laporan PPA: dari kode kecukupan air petak terburuk (C/KR/KS/KB → Aman/Waspada/Siaga/Kritis).
+ * Laporan lama tanpa kode kecukupan: aturan sementara luas kering/puso.
  * Tahap 2 akan diganti Indeks Risiko Kekeringan (IRK) berbasis neraca air.
  */
 final class StatusKondisi
@@ -38,8 +39,8 @@ final class StatusKondisi
         self::KOSONG => '#9AA4A8',
     ];
 
-    /** Laporan lebih tua dari ini dianggap tidak mewakili kondisi terkini. */
-    public const MASA_BERLAKU_HARI = 3;
+    /** Laporan lebih tua dari ini dianggap tidak mewakili kondisi terkini (laporan rutin tiap Senin berlaku sepekan). */
+    public const MASA_BERLAKU_HARI = 7;
 
     public static function dariLaporan(?LaporanHarian $l): string
     {
@@ -48,6 +49,9 @@ final class StatusKondisi
         }
         if ($l->getAttribute('status_gabungan')) {
             return $l->getAttribute('status_gabungan');
+        }
+        if ($st = $l->getAttributeValue('status')) { // dihitung dari kecukupan air tiap petak (format PPA)
+            return $st;
         }
 
         return self::dariNilai($l->kondisi_saluran, (float) $l->luas_tanam_ha, (float) $l->luas_kering_ha, (float) $l->luas_puso_ha);

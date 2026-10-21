@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Casts\Tanggal;
 use App\Models\Concerns\LogsActivity;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -18,7 +19,8 @@ class SesiPintu extends Model
 
     public const JENIS = [
         'rutin' => 'Rutin mingguan (Senin)',
-        'harian' => 'Laporan harian PPA',
+        'harian' => 'Laporan PPA',
+        'air' => 'Laporan Manager Air',
         'panen' => 'Panen',
         'pekerjaan' => 'Pekerjaan di sawah/saluran',
         'kejadian' => 'Kejadian khusus (kekeringan, banjir, kerusakan)',
@@ -36,10 +38,10 @@ class SesiPintu extends Model
     /** Alasan yang bisa dipilih di form pembacaan pintu ('harian' otomatis dari laporan harian PPA). */
     public static function jenisPilihan(): array
     {
-        return array_diff_key(self::JENIS, ['harian' => true]);
+        return array_diff_key(self::JENIS, ['harian' => true, 'air' => true]);
     }
 
-    protected $fillable = ['daerah_irigasi_id', 'user_id', 'laporan_harian_id', 'tanggal', 'jam', 'jenis', 'catatan', 'lat', 'lng'];
+    protected $fillable = ['daerah_irigasi_id', 'user_id', 'laporan_harian_id', 'laporan_air_id', 'tanggal', 'jam', 'jenis', 'catatan', 'lat', 'lng'];
 
     protected $casts = ['tanggal' => Tanggal::class, 'lat' => 'float', 'lng' => 'float'];
 
@@ -63,6 +65,17 @@ class SesiPintu extends Model
         return $this->belongsTo(LaporanHarian::class);
     }
 
+    public function laporanAir(): BelongsTo
+    {
+        return $this->belongsTo(LaporanAir::class);
+    }
+
+    /** Sesi yang dibuat dari laporan PPA / Manager diubah lewat laporannya. */
+    public function dariLaporan(): bool
+    {
+        return (bool) ($this->laporan_harian_id || $this->laporan_air_id);
+    }
+
     public function pembacaan(): HasMany
     {
         return $this->hasMany(PembacaanPintu::class);
@@ -84,8 +97,8 @@ class SesiPintu extends Model
     }
 
     /** Senin minggu berjalan (awal kewajiban baca rutin). */
-    public static function seninIni(): \Carbon\Carbon
+    public static function seninIni(): Carbon
     {
-        return today()->startOfWeek(\Carbon\Carbon::MONDAY);
+        return today()->startOfWeek(Carbon::MONDAY);
     }
 }

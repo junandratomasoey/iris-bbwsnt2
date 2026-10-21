@@ -5,7 +5,9 @@ namespace App\Services;
 use App\Models\DaerahIrigasi;
 use App\Models\LaporanAir;
 use App\Models\LaporanHarian;
+use App\Models\LaporanPetak;
 use App\Models\SubDaerahIrigasi;
+use App\Support\KodeIsian;
 use App\Support\StatusKondisi;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
@@ -16,12 +18,10 @@ use Illuminate\Support\Collection;
  */
 class KondisiService
 {
-    private const URUT_SALURAN = ['penuh' => 0, 'normal' => 1, 'kurang' => 2, 'kering' => 3];
-
     /**
-     * Laporan terkini per Sub-D.I. (key = sub id). Bila Sub-D.I. dilaporkan per petak tersier, laporan terakhir
-     * tiap petak digabung: luas & debit dijumlah, kondisi saluran & status diambil yang terberat.
-     * Laporan tingkat Sub-D.I. hanya dipakai bila belum ada laporan per petak.
+     * Laporan terkini per Sub-D.I. (key = sub id). Kondisi tiap petak tersier diambil dari laporan PPA terakhir
+     * yang memuat petak itu (masih berlaku), lalu digabung: luas dijumlah, status = petak terberat.
+     * Baris "seluruh Sub-D.I." (sebelum ada petak) hanya dipakai bila belum ada laporan per petak.
      *
      * @return Collection<int, LaporanHarian>
      */
@@ -30,57 +30,70 @@ class KondisiService
         $dari = $tanggal->copy()->subDays(StatusKondisi::MASA_BERLAKU_HARI - 1)->toDateString();
 
         return LaporanHarian::query()
-            ->with('petak:id,kode,nama,luas_layanan_ha')
+            ->with('petak.pintu:id,kode,nama,luas_layanan_ha')
             ->whereBetween('tanggal', [$dari, $tanggal->toDateString()])
             ->where('status_verifikasi', '!=', 'perbaikan')
             ->when($subIds !== null, fn ($q) => $q->whereIn('sub_daerah_irigasi_id', $subIds))
             ->orderBy('tanggal')->orderBy('id')
             ->get()
             ->groupBy('sub_daerah_irigasi_id')
-            ->map(fn ($daftar) => $this->gabung($daftar->keyBy('petak_kunci'))); // yang terakhir menimpa → paling baru per petak
+            ->map(fn ($daftar) => $this->gabung($daftar));
     }
 
-    /** @param Collection<int, LaporanHarian> $unit laporan terakhir per petak (key 0 = tingkat Sub-D.I.) */
-    public function gabung(Collection $unit): LaporanHarian
+    /** @param Collection<int, LaporanHarian> $laporan laporan satu Sub-D.I., urut lama → baru */
+    public function gabung(Collection $laporan): LaporanHarian
     {
-        if ($unit->keys()->contains(fn ($k) => $k > 0)) {
-            $unit = $unit->filter(fn ($l, $k) => $k > 0); // (Eloquent except() memakai id model, bukan kunci)
-        }
-        $terbaru = $unit->sortBy(fn ($l) => [$l->tanggal->toDateString(), $l->id])->last();
-        if ($unit->count() === 1) {
-            if ($terbaru->pintu_air_id) {
-                $terbaru->setAttribute('petak_rinci', [$this->rinci($terbaru)]);
+        $unit = [];
+        foreach ($laporan->sortBy(fn ($l) => [$l->tanggal->toDateString(), $l->id]) as $l) {
+            foreach ($l->petak as $b) {
+                $unit[(int) $b->pintu_air_id] = ['baris' => $b, 'laporan' => $l]; // yang terakhir menimpa → paling baru per petak
             }
-
+        }
+        $unit = collect($unit);
+        if ($unit->keys()->contains(fn ($k) => $k > 0)) {
+            $unit = $unit->filter(fn ($u, $k) => $k > 0);
+        }
+        $terbaru = $laporan->sortBy(fn ($l) => [$l->tanggal->toDateString(), $l->id])->last();
+        if ($unit->isEmpty()) {
             return $terbaru;
         }
 
         $g = clone $terbaru;
-        foreach (['luas_tanam_ha', 'luas_padi_ha', 'luas_palawija_ha', 'luas_horti_ha', 'luas_hijau_ha', 'luas_kering_ha', 'luas_panen_ha', 'luas_puso_ha'] as $k) {
-            $g->setAttribute($k, round($unit->sum(fn ($l) => (float) $l->$k), 2));
-        }
-        // data air hanya ada di laporan lama (sebelum laporan air dipisah ke Manager)
-        $berair = $unit->filter(fn ($l) => $l->debit_intake_lps !== null);
-        $g->setAttribute('debit_intake_lps', $berair->isNotEmpty() ? round($berair->sum(fn ($l) => (float) $l->debit_intake_lps), 2) : null);
-        $g->setAttribute('tma_cm', $berair->isNotEmpty() ? round($berair->avg(fn ($l) => (float) $l->tma_cm), 1) : null);
-        $g->setAttribute('kondisi_saluran', $unit->pluck('kondisi_saluran')->sortBy(fn ($k) => self::URUT_SALURAN[$k] ?? -1)->last());
-        $g->setAttribute('jenis_palawija', $unit->pluck('jenis_palawija')->filter()->flatMap(fn ($j) => array_map('trim', explode(',', $j)))->unique()->implode(', ') ?: null);
-        $g->setAttribute('jenis_horti', $unit->pluck('jenis_horti')->filter()->flatMap(fn ($j) => array_map('trim', explode(',', $j)))->unique()->implode(', ') ?: null);
-        $g->setAttribute('status_gabungan', $unit->reduce(fn ($s, $l) => StatusKondisi::maks($s, StatusKondisi::dariLaporan($l)), StatusKondisi::KOSONG));
-        $g->setAttribute('petak_rinci', $unit->sortBy(fn ($l) => $l->petak?->kode)->map(fn ($l) => $this->rinci($l))->values()->all());
-        $g->setRelation('petak', null);
+        $baris = $unit->pluck('baris');
+        $tanam = $baris->reject->bera();
+        $jumlah = fn ($kumpulan, $k) => round($kumpulan->sum(fn ($b) => (float) $b->$k), 2);
+        $panen = round($tanam->sum(fn ($b) => $b->fase === 6 ? (float) $b->luas_tanam_ha : (float) $b->luas_panen_ha), 2);
+        $palawija = $tanam->whereIn('jenis_tanaman', ['J', 'K', 'Pl']);
+        $g->setAttribute('luas_tanam_ha', $jumlah($tanam, 'luas_tanam_ha'));
+        $g->setAttribute('luas_padi_ha', $jumlah($tanam->where('jenis_tanaman', 'P'), 'luas_tanam_ha'));
+        $g->setAttribute('luas_palawija_ha', $jumlah($palawija, 'luas_tanam_ha'));
+        $g->setAttribute('luas_horti_ha', 0);
+        $g->setAttribute('jenis_palawija', $palawija->pluck('jenis_tanaman')->unique()->map(fn ($k) => KodeIsian::JENIS_TANAMAN[$k])->implode(', ') ?: null);
+        $g->setAttribute('jenis_horti', null);
+        $g->setAttribute('luas_kering_ha', $jumlah($baris, 'luas_kering_ha'));
+        $g->setAttribute('luas_puso_ha', $jumlah($baris, 'luas_puso_ha'));
+        $g->setAttribute('luas_panen_ha', $panen);
+        $g->setAttribute('luas_hijau_ha', max(0, round($jumlah($tanam, 'luas_tanam_ha') - $jumlah($baris, 'luas_kering_ha') - $panen, 2)));
+        $g->setAttribute('status_gabungan', $baris->reduce(fn ($s, $b) => StatusKondisi::maks($s, $b->status ?? $b->hitungStatus()), StatusKondisi::KOSONG));
+        $g->setAttribute('kekurangan_air', $baris->whereIn('kecukupan_air', ['KR', 'KS', 'KB'])->count());
+        $g->setAttribute('kelebihan_air', $baris->where('kecukupan_air', 'Bj')->count());
+        $g->setAttribute('petak_rinci', $unit->sortBy(fn ($u) => $u['baris']->pintu?->kode)->map(fn ($u) => $this->rinci($u['baris'], $u['laporan']))->values()->all());
+        $g->setRelation('petak', $baris->values());
 
         return $g;
     }
 
-    private function rinci(LaporanHarian $l): array
+    private function rinci(LaporanPetak $b, LaporanHarian $l): array
     {
-        $st = StatusKondisi::dariLaporan($l);
+        $st = $b->status ?? $b->hitungStatus();
 
         return [
-            'laporan_id' => $l->id, 'kode' => $l->petak?->kode, 'nama' => $l->petak?->nama, 'tanggal' => $l->tanggal->toDateString(),
-            'status' => $st, 'tanam' => (float) $l->luas_tanam_ha, 'kering' => (float) $l->luas_kering_ha, 'puso' => (float) $l->luas_puso_ha,
-            'kondisi' => $l->kondisi_saluran, 'debit' => $l->debit_intake_lps === null ? null : (float) $l->debit_intake_lps,
+            'laporan_id' => $l->id, 'kode' => $b->pintu?->kode, 'nama' => $b->pintu?->nama ?? ($b->pintu_air_id ? null : 'Seluruh Sub-D.I.'),
+            'tanggal' => $l->tanggal->toDateString(), 'status' => $st,
+            'tanam' => (float) $b->luas_tanam_ha, 'kering' => (float) $b->luas_kering_ha, 'puso' => (float) $b->luas_puso_ha,
+            'jenis' => KodeIsian::JENIS_TANAMAN[$b->jenis_tanaman] ?? null, 'fase' => KodeIsian::FASE[$b->fase] ?? null,
+            'umur' => $b->umur_hst, 'kecukupan' => $b->kecukupan_air, 'kecukupan_label' => KodeIsian::KECUKUPAN_AIR[$b->kecukupan_air] ?? null,
+            'kondisi' => null, 'debit' => null,
         ];
     }
 
@@ -175,6 +188,7 @@ class KondisiService
                 'debit_total_lps' => $air ? round($air->debit_intake_lps, 1) : round($agg['debit'], 1),
                 'air' => $air ? [
                     'tanggal' => $air->tanggal->toDateString(), 'kondisi' => $air->kondisi_saluran, 'status' => $air->status(),
+                    'pemberian' => $air->status_pemberian, 'tma_hulu_cm' => $air->tma_sungai_cm,
                     'debit_sungai_m3s' => $air->debit_sungai_m3s, 'tma_sungai_cm' => $air->tma_sungai_cm,
                     'debit_intake_lps' => $air->debit_intake_lps, 'tma_intake_cm' => $air->tma_intake_cm, 'id' => $air->id,
                 ] : null,

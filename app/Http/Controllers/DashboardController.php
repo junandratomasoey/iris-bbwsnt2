@@ -2,9 +2,12 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Kejadian;
+use App\Models\DaerahIrigasi;
 use App\Models\Kabupaten;
+use App\Models\Kejadian;
+use App\Models\LaporanAir;
 use App\Models\LaporanHarian;
+use App\Models\PintuAir;
 use App\Models\SubDaerahIrigasi;
 use App\Models\WilayahSatgas;
 use App\Services\KondisiService;
@@ -25,14 +28,16 @@ class DashboardController extends Controller
         if ($user->hasRole(Role::PETUGAS, Role::POB)) {
             $subs = SubDaerahIrigasi::with('daerahIrigasi:id,nama')
                 ->whereIn('id', $user->subIdsPelaporan() ?? [])->orderBy('daerah_irigasi_id')->orderBy('nama')->get();
-            $hariIni = LaporanHarian::whereDate('tanggal', $hari)->whereIn('sub_daerah_irigasi_id', $subs->pluck('id'))
-                ->get()->keyBy(fn ($l) => $l->sub_daerah_irigasi_id.':'.$l->petak_kunci);
+            // laporan PPA pekan ini (rutin tiap Senin) milik petugas ini, per Sub-D.I.
+            $senin = $hari->copy()->startOfWeek();
+            $pekanIni = LaporanHarian::where('user_id', $user->id)->whereBetween('tanggal', [$senin->toDateString(), $hari->toDateString()])
+                ->whereIn('sub_daerah_irigasi_id', $subs->pluck('id'))->orderBy('tanggal')->get()->groupBy('sub_daerah_irigasi_id');
             // PPA melapor per petak tersier yang ditugaskan kepadanya
             $petakSaya = $user->pintuTugas()->where('tingkat', 'tersier')->where('aktif', true)
                 ->whereIn('sub_daerah_irigasi_id', $subs->pluck('id'))->orderBy('urutan')->orderBy('kode')->get(['pintu_air.id', 'kode', 'nama', 'sub_daerah_irigasi_id', 'luas_layanan_ha'])
                 ->groupBy('sub_daerah_irigasi_id');
-            $petakAdaDiSub = \App\Models\PintuAir::tersier()->where('aktif', true)->whereIn('sub_daerah_irigasi_id', $subs->pluck('id'))->distinct()->pluck('sub_daerah_irigasi_id')->flip();
-            $riwayat = LaporanHarian::with('subDaerahIrigasi:id,nama', 'petak:id,kode')->where('user_id', $user->id)
+            $petakAdaDiSub = PintuAir::tersier()->where('aktif', true)->whereIn('sub_daerah_irigasi_id', $subs->pluck('id'))->distinct()->pluck('sub_daerah_irigasi_id')->flip();
+            $riwayat = LaporanHarian::with('subDaerahIrigasi:id,nama')->withCount('petak')->where('user_id', $user->id)
                 ->latest('tanggal')->latest('id')->limit(10)->get();
 
             $svc = app(PintuService::class);
@@ -41,7 +46,7 @@ class DashboardController extends Controller
             $ids = $tugas ?: $svc->bolehIsi($user)->where('aktif', true)->pluck('id')->all();
             $pintu = $user->boleh('isi-pintu') && $ids ? $svc->perDi($svc->daftar(null, null, 2, $ids)) : collect();
 
-            return view('dashboard.petugas', compact('subs', 'hariIni', 'riwayat', 'pintu', 'petakSaya', 'petakAdaDiSub'));
+            return view('dashboard.petugas', compact('subs', 'pekanIni', 'senin', 'riwayat', 'pintu', 'petakSaya', 'petakAdaDiSub'));
         }
 
         $subIds = $user->subIdsTerjangkau();
@@ -65,7 +70,8 @@ class DashboardController extends Controller
         $luasPerStatus = collect(StatusKondisi::URUTAN)->map(fn ($_, $s) => $ringkasan->where('status', $s)->sum('luas_ha'));
 
         $totalSub = $subIds === null ? SubDaerahIrigasi::count() : count($subIds);
-        $laporHariIni = LaporanHarian::whereDate('tanggal', $hari)
+        $senin = $hari->copy()->startOfWeek();
+        $laporHariIni = LaporanHarian::whereBetween('tanggal', [$senin->toDateString(), $hari->toDateString()])
             ->when($subIds !== null, fn ($q) => $q->whereIn('sub_daerah_irigasi_id', $subIds))->distinct()->count('sub_daerah_irigasi_id');
 
         $kritis = $laporan->map(fn ($l) => ['laporan' => $l, 'status' => StatusKondisi::dariLaporan($l)])
@@ -76,11 +82,11 @@ class DashboardController extends Controller
 
         // kepatuhan lapor per Satgas
         // kepatuhan lapor per Satgas (+ kabupaten yang belum masuk Satgas, agar jumlahnya sama dengan total)
-        $hitungKepatuhan = function (?WilayahSatgas $w) use ($hari, $subIds) {
+        $hitungKepatuhan = function (?WilayahSatgas $w) use ($hari, $senin, $subIds) {
             $kab = Kabupaten::where('wilayah_satgas_id', $w?->id)->whereHas('daerahIrigasi')->orderBy('nama')->pluck('nama');
             $ids = SubDaerahIrigasi::whereHas('daerahIrigasi.kabupaten', fn ($k) => $k->where('wilayah_satgas_id', $w?->id))
                 ->when($subIds !== null, fn ($q) => $q->whereIn('id', $subIds))->pluck('id');
-            $masuk = $ids->isEmpty() ? 0 : LaporanHarian::whereDate('tanggal', $hari)->whereIn('sub_daerah_irigasi_id', $ids)->distinct()->count('sub_daerah_irigasi_id');
+            $masuk = $ids->isEmpty() ? 0 : LaporanHarian::whereBetween('tanggal', [$senin->toDateString(), $hari->toDateString()])->whereIn('sub_daerah_irigasi_id', $ids)->distinct()->count('sub_daerah_irigasi_id');
 
             return ['kode' => $w?->kode, 'cakupan' => $w?->cakupan, 'kabupaten' => $kab->implode(', '), 'total' => $ids->count(), 'masuk' => $masuk];
         };
@@ -92,8 +98,8 @@ class DashboardController extends Controller
             ->groupBy('status_penanganan')->get()->keyBy('status_penanganan');
 
         $diIds = $user->diIdsTerjangkau();
-        $airHariIni = \App\Models\LaporanAir::whereDate('tanggal', $hari)->when($diIds !== null, fn ($q) => $q->whereIn('daerah_irigasi_id', $diIds))->count();
-        $totalDi = $diIds === null ? \App\Models\DaerahIrigasi::count() : count($diIds);
+        $airHariIni = LaporanAir::whereBetween('tanggal', [$senin->toDateString(), $hari->toDateString()])->when($diIds !== null, fn ($q) => $q->whereIn('daerah_irigasi_id', $diIds))->distinct()->count('daerah_irigasi_id');
+        $totalDi = $diIds === null ? DaerahIrigasi::count() : count($diIds);
         $svcPintu = app(PintuService::class);
         $pintu = $svcPintu->hitung($svcPintu->daftar($subIds, null, 2));
 

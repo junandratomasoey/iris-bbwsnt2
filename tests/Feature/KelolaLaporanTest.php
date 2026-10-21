@@ -67,8 +67,8 @@ class KelolaLaporanTest extends TestCase
     private function laporan(array $baca, array $ubah = []): array
     {
         return $ubah + [
-            'tanggal' => today()->toDateString(), 'sub_daerah_irigasi_id' => $this->sub->id, 'pintu_air_id' => $this->t1->id, 'baca' => $baca,
-            'luas_tanam_ha' => 40, 'luas_hijau_ha' => 40, 'luas_kering_ha' => 0, 'luas_panen_ha' => 0, 'luas_puso_ha' => 0,
+            'tanggal' => today()->toDateString(), 'jenis' => 'rutin', 'sub_daerah_irigasi_id' => $this->sub->id, 'baca' => $baca,
+            'petak' => [$this->t1->id => ['jenis_tanaman' => 'P', 'luas_tanam_ha' => 40, 'fase' => 3, 'kecukupan_air' => 'C', 'luas_kering_ha' => 0]],
         ];
     }
 
@@ -87,18 +87,19 @@ class KelolaLaporanTest extends TestCase
         $this->actingAs($this->adminOp)->get(route('laporan.edit', $l))->assertOk()->assertSee('BOs.1 ka');
         $this->actingAs($this->adminOp)->put(route('laporan.update', $l), $this->laporan([
             $this->t1->id => ['debit' => 30, 'tma' => 20], $this->t2->id => ['debit' => 55, 'tma' => 31],
-        ], ['luas_hijau_ha' => 35, 'luas_kering_ha' => 5]))->assertSessionHasNoErrors();
+        ], ['petak' => [$this->t1->id => ['jenis_tanaman' => 'P', 'luas_tanam_ha' => 40, 'fase' => 3, 'kecukupan_air' => 'KR', 'luas_kering_ha' => 5]]]))->assertSessionHasNoErrors();
 
         $l->refresh();
         $this->assertSame($this->ppaA->id, $l->user_id);                 // tetap laporan PPA A
         $this->assertSame('disetujui', $l->status_verifikasi);
         $this->assertSame(5.0, (float) $l->luas_kering_ha);
+        $this->assertSame('waspada', $l->status());
         $this->assertSame(30.0, PembacaanPintu::where('pintu_air_id', $this->t1->id)->value('debit_lps') + 0.0);
         $this->assertSame(31.0, PembacaanPintu::where('pintu_air_id', $this->t2->id)->value('tma_cm') + 0.0);
         $this->assertSame($this->ppaA->id, $l->sesiPintu->user_id);
 
         // sesi pintu harian: tautan ubah lewat laporan untuk admin
-        $this->actingAs($this->adminOp)->get(route('pembacaan-pintu.show', $l->sesiPintu))->assertOk()->assertSee('Ubah lewat laporan tanaman');
+        $this->actingAs($this->adminOp)->get(route('pembacaan-pintu.show', $l->sesiPintu))->assertOk()->assertSee('Ubah lewat laporan PPA');
 
         // Super Admin menghapus
         $this->actingAs($this->sa)->delete(route('laporan.destroy', $l))->assertRedirect();
@@ -110,7 +111,7 @@ class KelolaLaporanTest extends TestCase
     {
         $l = LaporanAir::create(['daerah_irigasi_id' => $this->di->id, 'user_id' => $this->manager->id, 'tanggal' => today()->subDays(20),
             'debit_intake_lps' => 900, 'tma_intake_cm' => 60, 'kondisi_saluran' => 'normal']);
-        $data = ['daerah_irigasi_id' => $this->di->id, 'tanggal' => $l->tanggal->toDateString(), 'debit_intake_lps' => 750, 'tma_intake_cm' => 55, 'kondisi_saluran' => 'kurang'];
+        $data = ['daerah_irigasi_id' => $this->di->id, 'tanggal' => $l->tanggal->toDateString(), 'jenis' => 'rutin', 'tma_sungai_cm' => 70, 'debit_intake_lps' => 750, 'tma_intake_cm' => 55];
 
         $this->actingAs($this->manager)->put(route('laporan-air.update', $l), $data)->assertForbidden();   // lewat 7 hari
         $this->actingAs($this->adminOp)->get(route('laporan-air.show', $l))->assertOk()->assertSee('Ubah');

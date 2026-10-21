@@ -8,7 +8,7 @@ use Illuminate\Http\Request;
 
 /**
  * Periode tampilan dashboard & peta.
- * hari_ini = kondisi terkini (laporan 3 hari terakhir); lainnya = rekap rentang tanggal.
+ * hari_ini = kondisi terkini (laporan 7 hari terakhir); lainnya = rekap rentang tanggal.
  */
 final class Periode
 {

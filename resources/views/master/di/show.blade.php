@@ -69,7 +69,7 @@
             <div class="flex justify-between"><dt class="text-basalt-soft">Potensial (SHP)</dt><dd>{{ angka($di->luas_potensial_ha) }} Ha</dd></div>
             <div class="flex justify-between"><dt class="text-basalt-soft">Fungsional (SHP)</dt><dd>{{ angka($di->luas_fungsional_ha) }} Ha</dd></div>
             <div class="flex justify-between"><dt class="text-basalt-soft">MT berjalan</dt><dd>{{ $ring['mt'] ?? 'Belum dijadwalkan' }}</dd></div>
-            <div class="flex justify-between"><dt class="text-basalt-soft">Melapor (3 hari)</dt><dd>{{ $ring['sub_lapor'] ?? 0 }}/{{ $ring['jumlah_sub'] ?? 0 }} Sub-D.I.</dd></div>
+            <div class="flex justify-between"><dt class="text-basalt-soft">Melapor (7 hari)</dt><dd>{{ $ring['sub_lapor'] ?? 0 }}/{{ $ring['jumlah_sub'] ?? 0 }} Sub-D.I.</dd></div>
             <div class="flex justify-between"><dt class="text-basalt-soft">Debit intake (laporan air)</dt><dd>{{ angka($ring['debit_total_lps'] ?? 0, 1) }} L/dt</dd></div>
         </dl>
         @if($di->tenaga_op)

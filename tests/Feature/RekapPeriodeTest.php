@@ -10,6 +10,7 @@ use App\Models\WilayahSatgas;
 use App\Services\RekapService;
 use App\Support\Periode;
 use App\Support\Role;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
 use Tests\TestCase;
@@ -51,33 +52,32 @@ class RekapPeriodeTest extends TestCase
         return app(RekapService::class)->rekap($p, null);
     }
 
-    public function test_status_harian_berlaku_3_hari_dan_luas_memakai_puncak(): void
+    public function test_status_harian_berlaku_7_hari_dan_luas_memakai_puncak(): void
     {
-        $h = fn ($n) => today()->subDays(10 - $n)->toDateString(); // hari ke-1 .. ke-10 dalam periode
-        $this->lapor(0, $h(1), 'normal', 100, 5);          // aman, berlaku hari 1–3
-        $this->lapor(0, $h(5), 'kering', 100, 60, 2);      // kritis (puso), berlaku hari 5–7
-        $this->lapor(0, $h(6), 'normal', 120, 10);         // aman tapi Sub B kritis di hari yang sama → D.I. tetap kritis
-        $this->lapor(1, $h(6), 'kurang', 80, 0);           // waspada
+        $h = fn ($n) => today()->subDays(14 - $n)->toDateString(); // hari ke-1 .. ke-14 dalam periode
+        $this->lapor(0, $h(1), 'normal', 100, 5);          // aman, berlaku hari 1–7
+        $this->lapor(0, $h(9), 'kering', 100, 60, 2);      // kritis (puso), hari 9
+        $this->lapor(0, $h(10), 'normal', 120, 10);        // aman, menggantikan laporan hari 9
+        $this->lapor(1, $h(10), 'kurang', 80, 0);          // waspada, Sub B hari 10–14
 
-        $r = $this->rekap($h(1), $h(10));
+        $r = $this->rekap($h(1), $h(14));
         $d = $r['di'][$this->di->id];
 
-        // hari 1–3 aman, 4 kosong, 5 kritis, 6 waspada (Sub A aman + Sub B waspada), 7–8 waspada/aman, 9–10 kosong
-        $this->assertSame(10, $r['jumlah_hari']);
+        // hari 1–7 aman, 8 kosong, 9 kritis, 10–14 waspada (Sub A aman + Sub B waspada)
+        $this->assertSame(14, $r['jumlah_hari']);
         $this->assertSame('kritis', $d['terberat']);
-        $this->assertSame(1, $d['hari']['kritis']);
-        $this->assertSame(3, $d['hari']['aman']);
-        $this->assertSame(3, $d['hari']['waspada']);
-        $this->assertSame(3, $d['hari']['kosong']);
-        $this->assertSame('waspada', $d['tersering']); // seri 3 hari aman vs 3 hari waspada → yang lebih berat
+        $this->assertSame([7, 1, 1, 5], [$d['hari']['aman'], $d['hari']['kosong'], $d['hari']['kritis'], $d['hari']['waspada']]);
+        $this->assertSame('aman', $d['tersering']);
 
         // puncak per Sub-D.I. lalu dijumlah: tanam 120 + 80, kering 60 + 0, puso 2 — bukan jumlah semua laporan
         $this->assertEquals(200, $d['puncak_tanam_ha']);
         $this->assertEquals(60, $d['puncak_kering_ha']);
         $this->assertEquals(2, $d['puncak_puso_ha']);
-        // 4 laporan dari 2 Sub-D.I. × 10 hari
-        $this->assertSame(20, $d['kepatuhan']);
-        $this->assertSame([3, 1, 3, 3, 0], [$r['total']['hari_di']['kosong'], $r['total']['hari_di']['kritis'], $r['total']['hari_di']['waspada'], $r['total']['hari_di']['aman'], $r['total']['hari_di']['siaga']]);
+        // kepatuhan per pekan (rutin tiap Senin): pekan yang ada laporan ÷ (Sub-D.I. × pekan dalam periode)
+        $pekan = fn (array $hari) => collect($hari)->map(fn ($x) => Carbon::parse($h($x))->startOfWeek()->toDateString())->unique()->count();
+        $jumlahPekan = $pekan(range(1, 14));
+        $this->assertSame($jumlahPekan, $r['total']['jumlah_minggu']);
+        $this->assertSame((int) round(($pekan([1, 9, 10]) + $pekan([10])) / (2 * $jumlahPekan) * 100), $d['kepatuhan']);
     }
 
     public function test_periode_dan_kalender_mingguan(): void

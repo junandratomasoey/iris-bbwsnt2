@@ -57,7 +57,7 @@ class RekapController extends Controller
             }
 
             fputcsv($out, [], ';');
-            fputcsv($out, ['Catatan: luas = nilai tertinggi yang dilaporkan tiap Sub-D.I. selama periode lalu dijumlah; status harian memakai laporan yang berumur maksimal 3 hari.'], ';');
+            fputcsv($out, ['Catatan: luas = nilai tertinggi yang dilaporkan tiap Sub-D.I. selama periode lalu dijumlah; status harian memakai laporan yang berumur maksimal 7 hari (rutin tiap Senin); kepatuhan = pekan yang ada laporan.'], ';');
             fclose($out);
         }, $nama, ['Content-Type' => 'text/csv; charset=UTF-8']);
     }
