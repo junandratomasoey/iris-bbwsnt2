@@ -194,6 +194,9 @@ export function createMap(opsi) {
         detailGalat: null,
         detailTab: 'foto',
         memuatLama: false,
+        // Sub-D.I. terpilih di dalam panel D.I.
+        subId: null,
+        subCatatan: null,
 
         get diTampil() {
             if (!this.data) return [];
@@ -462,7 +465,7 @@ export function createMap(opsi) {
             const ganti = this.detailId !== id;
             this.detailId = id;
             this.panel = true;
-            if (ganti) { this.detail = null; this.detailTab = 'foto'; this.$refs.panel?.scrollTo({ top: 0 }); }
+            if (ganti) { this.detail = null; this.detailTab = 'foto'; this.tutupSub(false); this.$refs.panel?.scrollTo({ top: 0 }); }
             this.detailMemuat = true;
             this.detailGalat = null;
             map.closePopup();
@@ -478,6 +481,10 @@ export function createMap(opsi) {
                 if (ganti && !this.detail.foto_harian.length) this.detailTab = 'sub';
                 this.gambarBangunanDi();
                 this.gambarPintuDi();
+                this.gambarSubDi();
+                if (this.subId) {
+                    if (this.subAktif) this.gambarSorotSub(this.subAktif, false); else this.tutupSub(false);
+                }
             } catch (e) {
                 this.detailGalat = 'Detail D.I. gagal dimuat.';
             }
@@ -487,7 +494,9 @@ export function createMap(opsi) {
         tutupDetail() {
             this.detailId = null;
             this.detail = null;
-            ['sorot', 'bangunanDi', 'pintuDi'].forEach((k) => { if (layers[k]) { map.removeLayer(layers[k]); layers[k] = null; } });
+            this.subId = null;
+            this.subCatatan = null;
+            ['sorot', 'sorotSub', 'subDi', 'bangunanDi', 'pintuDi'].forEach((k) => { if (layers[k]) { map.removeLayer(layers[k]); layers[k] = null; } });
         },
 
         async muatFotoLama() {
@@ -541,6 +550,87 @@ export function createMap(opsi) {
             if (!terbang) return;
             if (layers.sorot) map.flyToBounds(layers.sorot.getBounds(), { padding: [30, 30], maxZoom: 14, duration: 0.8 });
             else if (d.lat) map.flyTo([d.lat, d.lng], 12, { duration: 0.8 });
+        },
+
+        get subAktif() {
+            return this.subId ? (this.detail?.sub || []).find((s) => s.id === this.subId) || null : null;
+        },
+
+        /** Klik Sub-D.I. di daftar/peta: buka keterangannya di panel & arahkan peta ke areal Sub-D.I. */
+        bukaSub(s) {
+            this.subId = s.id;
+            this.panel = true;
+            this.$nextTick(() => this.$refs.panel?.scrollTo({ top: 0 }));
+            this.gambarSorotSub(s, true);
+        },
+
+        tutupSub(terbang = true) {
+            const ada = this.subId;
+            this.subId = null;
+            this.subCatatan = null;
+            if (layers.sorotSub) { map.removeLayer(layers.sorotSub); layers.sorotSub = null; }
+            if (ada && terbang) this.gambarSorot(true);
+        },
+
+        /** Sorot Sub-D.I.: batas areal bila sudah digambar, titik Sub-D.I., atau titik bangunan & pintu airnya. */
+        gambarSorotSub(s, terbang = true) {
+            if (layers.sorotSub) { map.removeLayer(layers.sorotSub); layers.sorotSub = null; }
+            this.subCatatan = null;
+            if (!s) return;
+            const KUNING = '#F2B705';
+            const grup = L.featureGroup();
+            let batas = null;
+            if (s.geometri) {
+                batas = L.geoJSON(s.geometri, { interactive: false, style: { color: KUNING, weight: 3.5, opacity: 1, fillColor: s.warna, fillOpacity: 0.28 } }).addTo(grup);
+            }
+            const titik = (s.titik || []).slice();
+            if (s.lat && s.lng) titik.unshift([s.lat, s.lng]);
+            if (!s.geometri) {
+                (s.titik || []).forEach((t) => L.circleMarker(t, { radius: 13, color: KUNING, weight: 3, fill: false, interactive: false }).addTo(grup));
+            }
+            const pusat = s.lat && s.lng ? [s.lat, s.lng] : (batas ? batas.getBounds().getCenter() : (titik[0] || null));
+            if (pusat) {
+                L.circleMarker(pusat, { radius: 8, color: '#fff', weight: 3, fillColor: s.warna, fillOpacity: 1 })
+                    .bindTooltip('Sub-D.I. ' + s.nama, { permanent: true, direction: 'top', offset: [0, -8] }).addTo(grup);
+            }
+            if (grup.getLayers().length) layers.sorotSub = grup.addTo(map);
+            if (!terbang) return;
+            const b = batas ? batas.getBounds() : (titik.length ? L.latLngBounds(titik) : null);
+            if (b && b.isValid()) {
+                const satuTitik = b.getNorthEast().distanceTo(b.getSouthWest()) < 50;
+                if (satuTitik) map.flyTo(b.getCenter(), 15, { duration: 0.8 });
+                else map.flyToBounds(b, { padding: [40, 40], maxZoom: 15, duration: 0.8 });
+                if (!s.geometri) this.subCatatan = s.lat ? 'Batas areal Sub-D.I. belum digambar — peta diarahkan ke titik Sub-D.I.'
+                    : 'Batas areal Sub-D.I. belum digambar — peta diarahkan ke bangunan & pintu air Sub-D.I. ini (lingkaran kuning).';
+            } else {
+                this.gambarSorot(true);
+                this.subCatatan = 'Lokasi Sub-D.I. ini belum dipetakan — peta menampilkan seluruh D.I.';
+            }
+        },
+
+        /** Batas areal Sub-D.I. yang sudah digambar (D.I. terpilih): garis tipis, klik untuk membuka Sub-D.I. */
+        gambarSubDi() {
+            if (layers.subDi) { map.removeLayer(layers.subDi); layers.subDi = null; }
+            const daftar = (this.detail?.sub || []).filter((s) => s.geometri);
+            if (!daftar.length) return;
+            const lyr = L.layerGroup();
+            daftar.forEach((s) => {
+                L.geoJSON(s.geometri, { style: { color: '#ffffff', weight: 1.5, dashArray: '4 3', fillColor: s.warna, fillOpacity: 0.18 } })
+                    .on('click', () => this.bukaSub(s)).bindTooltip(`Sub-D.I. ${s.nama} · ${s.status_label}`, { sticky: true, direction: 'top' }).addTo(lyr);
+            });
+            layers.subDi = lyr.addTo(map);
+        },
+
+        get diFungsional() {
+            return this.detail?.di?.luas?.fungsional || this.diPilih?.luas_ha || 0;
+        },
+        get diTertanam() {
+            return this.detail?.teknis?.tertanam ?? null;
+        },
+
+        /** Persentase a terhadap b (mis. tertanam terhadap fungsional). */
+        persen(a, b) {
+            return a !== null && a !== undefined && b > 0 ? Math.round((a / b) * 1000) / 10 : null;
         },
 
         /** Titik infrastruktur D.I. terpilih (yang sudah punya koordinat). */

@@ -11,6 +11,7 @@ use App\Models\SubDaerahIrigasi;
 use App\Models\User;
 use App\Services\FotoService;
 use App\Support\Role;
+use Database\Seeders\InfrastrukturSigaSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -140,8 +141,8 @@ class DetailDiDanInfrastrukturTest extends TestCase
         $lama = Bangunan::create(['daerah_irigasi_id' => $oesao->id, 'nama' => 'Bendung Oesao', 'jenis' => 'bendung', 'kondisi' => 'rusak_berat', 'kondisi_per' => '2026-10-01']);
         Bangunan::create(['daerah_irigasi_id' => $oesao->id, 'nama' => 'Bendung Dalam Kom', 'jenis' => 'bendung']);
 
-        $this->seed(\Database\Seeders\InfrastrukturSigaSeeder::class);
-        $this->seed(\Database\Seeders\InfrastrukturSigaSeeder::class); // dijalankan ulang: tidak ganda
+        $this->seed(InfrastrukturSigaSeeder::class);
+        $this->seed(InfrastrukturSigaSeeder::class); // dijalankan ulang: tidak ganda
 
         $lama->refresh();
         $this->assertNotNull($lama->lat);
@@ -179,5 +180,44 @@ class DetailDiDanInfrastrukturTest extends TestCase
         $this->actingAs($this->admin)->delete(route('master.daerah-irigasi.foto.destroy', [$this->di, $a]))->assertRedirect();
         Storage::disk('uploads')->assertMissing($path);
         $this->actingAs($this->admin)->get(route('master.daerah-irigasi.show', $this->di))->assertOk()->assertSee('Foto profil D.I.')->assertSee('1/3');
+    }
+
+    public function test_sub_di_punya_data_teknis_batas_foto_dan_tampil_di_peta_publik(): void
+    {
+        $poligon = ['type' => 'Polygon', 'coordinates' => [[[123.70, -10.10], [123.72, -10.10], [123.72, -10.12], [123.70, -10.12], [123.70, -10.10]]]];
+        $this->actingAs($this->admin)->put(route('master.sub.update', $this->sub), [
+            'nama' => 'Air Sagu', 'luas_ha' => 97, 'luas_fungsional_ha' => 80, 'kecamatan' => 'Kupang Timur', 'desa' => 'Oefafi, Oesao',
+            'saluran' => 'Sekunder Air Sagu', 'panjang_saluran_m' => 1250, 'keterangan' => 'Sawah tadah ujung saluran.',
+            'geometri' => json_encode($poligon),
+        ])->assertRedirect();
+        $this->sub->refresh();
+        $this->assertSame([80.0, 'Kupang Timur'], [$this->sub->luas_fungsional_ha, $this->sub->kecamatan]);
+        $this->assertSame('Polygon', $this->sub->geometri['type']);
+        $this->assertEqualsWithDelta(-10.11, $this->sub->lat, 0.001); // titik tengah batas areal
+
+        $this->actingAs($this->admin)->get(route('master.sub.edit', $this->sub))->assertOk()->assertSee('Batas areal Sub-D.I.')->assertSee('Foto Sub-D.I.');
+        $this->actingAs($this->admin)->post(route('master.sub.foto.store', $this->sub), [
+            'foto' => [UploadedFile::fake()->image('s.jpg', 1200, 900)], 'judul' => 'Areal hilir',
+        ])->assertSessionHas('ok');
+        $this->actingAs($this->petugas)->post(route('master.sub.foto.store', $this->sub), ['foto' => [UploadedFile::fake()->image('x.jpg')]])->assertForbidden();
+        $this->assertCount(1, $this->sub->fotoProfil()->get());
+
+        $this->laporan(today()->toDateString());
+        $sub = collect($this->getJson(route('api.publik.di', $this->di))->assertOk()->json('sub'))->firstWhere('id', $this->sub->id);
+        $this->assertSame('Sawah tadah ujung saluran.', $sub['keterangan']);
+        $this->assertSame('Areal hilir', $sub['foto'][0]['judul']);
+        $this->assertEquals(50, $sub['tertanam']);
+        $this->assertEquals(62.5, $sub['persen_tertanam']); // 50 dari 80 Ha fungsional
+        $this->assertSame('Polygon', $sub['geometri']['type']);
+        $this->assertArrayNotHasKey('petugas', $sub);
+        $this->assertNull($sub['url']);
+        $teknis = $this->getJson(route('api.publik.di', $this->di))->json('teknis');
+        $this->assertSame([1, 1], [$teknis['jumlah_sub'], $teknis['sub_berbatas']]);
+
+        // sub tanpa foto profil: foto laporan PPA terakhir jadi pengganti
+        $this->sub->fotoProfil()->get()->each->delete();
+        $sub = collect($this->getJson(route('api.publik.di', $this->di))->json('sub'))->firstWhere('id', $this->sub->id);
+        $this->assertSame([], $sub['foto']);
+        $this->assertCount(1, $sub['foto_laporan']);
     }
 }

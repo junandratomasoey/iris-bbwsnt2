@@ -8,6 +8,8 @@ use App\Models\Kejadian;
 use App\Models\LaporanAir;
 use App\Models\LaporanHarian;
 use App\Models\P3a;
+use App\Models\PintuAir;
+use App\Models\SubDaerahIrigasi;
 use App\Support\KodeIsian;
 use App\Support\Periode;
 use App\Support\StatusKondisi;
@@ -38,9 +40,16 @@ class DetailDiService
         if ($internal) {
             $subs->load('petugas:id,name,no_hp,jabatan');
         }
+        $subs->load(['fotoProfil', 'p3a:id,nama,sub_daerah_irigasi_id']);
         $ids = $subs->pluck('id')->all();
         $terkini = $this->kondisi->laporanTerkini($tgl, $ids);
         $ring = $this->kondisi->ringkasanDi($tgl, $subIds)->get($di->id);
+        $bangunan = $this->bangunan($di, $internal);
+        $pintu = PintuAir::where('daerah_irigasi_id', $di->id)->where('aktif', true)
+            ->when($subIds !== null, fn ($q) => $q->whereIn('sub_daerah_irigasi_id', $ids))
+            ->get(['id', 'sub_daerah_irigasi_id', 'tingkat', 'luas_layanan_ha', 'lat', 'lng']);
+        $fotoLaporan = $this->fotoLaporanTerakhir($ids, $tgl, $internal);
+        $konteks = ['bangunan' => collect($bangunan)->groupBy('sub_id'), 'pintu' => $pintu->groupBy('sub_daerah_irigasi_id'), 'foto' => $fotoLaporan];
 
         return [
             'tanggal' => $tgl->toDateString(),
@@ -62,13 +71,14 @@ class DetailDiService
             ])->values(),
             'ringkasan' => $ring ? collect($ring)->only(['status', 'status_label', 'warna', 'jumlah_sub', 'sub_lapor', 'luas_tanam_ha', 'luas_kering_ha', 'luas_puso_ha', 'luas_panen_ha', 'laporan_terakhir', 'mt']) : null,
             'jadwal' => $this->jadwal($di, $tgl),
-            'sub' => $subs->map(fn ($s) => $this->sub($s, $terkini->get($s->id), $internal))->sortBy(fn ($s) => [-StatusKondisi::URUTAN[$s['status']], $s['nama']])->values(),
+            'teknis' => $this->teknisDi($subs, $bangunan, $pintu, $ring),
+            'sub' => $subs->map(fn ($s) => $this->sub($s, $terkini->get($s->id), $internal, $konteks))->sortBy(fn ($s) => [-StatusKondisi::URUTAN[$s['status']], $s['nama']])->values(),
             'air' => $this->air($di, $tgl, $internal),
             'riwayat' => $riwayat = $this->riwayat($ids, $dariRiwayat, $tgl, $di->id),
             'riwayat_judul' => $p && $p->rekap()
                 ? 'Riwayat '.$p->label.(count($riwayat) < $p->jumlahHari() ? ' (per minggu)' : '')
                 : 'Riwayat 30 hari',
-            'bangunan' => $this->bangunan($di, $internal),
+            'bangunan' => $bangunan,
             'kejadian' => $this->kejadian($di, $subIds),
             'p3a' => P3a::where('daerah_irigasi_id', $di->id)->orderBy('nama')->pluck('nama'),
         ] + $this->fotoHarian($ids, $tgl, $internal, $di->id);
@@ -260,12 +270,84 @@ class DetailDiService
         ] : []);
     }
 
-    private function sub($s, ?LaporanHarian $l, bool $internal): array
+    /** Foto laporan PPA terakhir per Sub-D.I. (pengganti bila Sub-D.I. belum punya foto profil). */
+    private function fotoLaporanTerakhir(array $ids, Carbon $tgl, bool $internal)
+    {
+        if (! $ids) {
+            return collect();
+        }
+        $saring = fn ($q) => $q->whereIn('sub_daerah_irigasi_id', $ids)->whereHas('foto')->where('tanggal', '<=', $tgl->toDateString())
+            ->when(! $internal, fn ($w) => $w->where('status_verifikasi', '!=', 'perbaikan'));
+        $terakhir = $saring(LaporanHarian::query())->selectRaw('sub_daerah_irigasi_id, max(tanggal) as t')->groupBy('sub_daerah_irigasi_id')->get();
+        if ($terakhir->isEmpty()) {
+            return collect();
+        }
+
+        return $saring(LaporanHarian::query())->where(function ($q) use ($terakhir) {
+            foreach ($terakhir as $r) {
+                $q->orWhere(fn ($w) => $w->where('sub_daerah_irigasi_id', $r->sub_daerah_irigasi_id)->where('tanggal', Carbon::parse($r->t)->toDateString()));
+            }
+        })->with('foto')->orderByDesc('id')->get()->groupBy('sub_daerah_irigasi_id')
+            ->map(fn ($daftar) => $daftar->flatMap(fn ($l) => $l->foto->map(fn ($f) => [
+                'kecil' => $f->url_kecil, 'besar' => $f->url, 'judul' => 'Laporan PPA', 'tanggal' => $l->tanggal->translatedFormat('d M Y'),
+                'label' => 'Laporan PPA · '.$l->tanggal->translatedFormat('d M Y'),
+            ]))->take(6)->values());
+    }
+
+    /** Ringkasan data teknis jaringan D.I.: jumlah Sub-D.I., pintu per tingkat, petak tersier, bangunan per jenis. */
+    private function teknisDi($subs, array $bangunan, $pintu, $ring): array
+    {
+        $tersier = $pintu->where('tingkat', 'tersier');
+
+        return [
+            'jumlah_sub' => $subs->count(),
+            'luas_baku_sub' => round((float) $subs->sum('luas_ha'), 2),
+            'luas_fungsional_sub' => round((float) $subs->sum('luas_fungsional_ha'), 2),
+            'tertanam' => $ring ? (float) $ring['luas_tanam_ha'] : null,
+            'sub_berbatas' => $subs->filter(fn ($s) => ! empty($s->geometri))->count(),
+            'jumlah_petak' => $tersier->count(),
+            'luas_petak' => round((float) $tersier->sum('luas_layanan_ha'), 2),
+            'pintu' => collect(PintuAir::TINGKAT)->map(fn ($label, $k) => ['label' => $label, 'n' => $pintu->where('tingkat', $k)->count()])
+                ->filter(fn ($r) => $r['n'] > 0)->values(),
+            'bangunan' => collect($bangunan)->groupBy('jenis')->map(fn ($g, $j) => ['label' => $j, 'n' => $g->count()])->sortByDesc('n')->values(),
+            'saluran_m' => round((float) $subs->sum('panjang_saluran_m'), 1),
+        ];
+    }
+
+    private function sub($s, ?LaporanHarian $l, bool $internal, array $konteks = []): array
     {
         $st = StatusKondisi::dariLaporan($l);
+        $bangunan = collect($konteks['bangunan'][$s->id] ?? []);
+        $pintu = collect($konteks['pintu'][$s->id] ?? []);
+        $tersier = $pintu->where('tingkat', 'tersier');
+        $fungsional = (float) ($s->luas_fungsional_ha ?: $s->luas_ha);
+        $tanam = $l ? (float) $l->luas_tanam_ha : null;
+        $foto = $s->fotoProfil->take(SubDaerahIrigasi::MAKS_FOTO_PROFIL)->map(fn ($f) => [
+            'kecil' => $f->url_kecil, 'besar' => $f->url, 'judul' => $f->judul,
+            'tanggal' => $f->diambil_pada?->translatedFormat('d M Y'),
+            'label' => trim(($f->judul ?? 'Sub-D.I. '.$s->nama).($f->diambil_pada ? ' · '.$f->diambil_pada->translatedFormat('d M Y') : '')),
+        ])->values();
+        // titik bangunan & pintu Sub-D.I.: untuk mengarahkan peta bila batas areal belum digambar
+        $titik = $bangunan->filter(fn ($b) => $b['lat'] && $b['lng'])->map(fn ($b) => [round($b['lat'], 6), round($b['lng'], 6)])
+            ->concat($pintu->filter(fn ($p) => $p->lat && $p->lng)->map(fn ($p) => [round($p->lat, 6), round($p->lng, 6)]))->values();
+        $kondisiB = $bangunan->countBy(fn ($b) => $b['kondisi'] ?: 'belum');
 
         return [
             'id' => $s->id, 'nama' => $s->nama, 'luas_ha' => (float) $s->luas_ha, 'lokasi' => $s->lokasi,
+            'luas_fungsional_ha' => $s->luas_fungsional_ha === null ? null : (float) $s->luas_fungsional_ha,
+            'kecamatan' => $s->kecamatan, 'desa' => $s->desa, 'saluran' => $s->saluran,
+            'panjang_saluran_m' => $s->panjang_saluran_m === null ? null : (float) $s->panjang_saluran_m,
+            'keterangan' => $s->keterangan,
+            'tertanam' => $tanam,
+            'persen_tertanam' => $tanam !== null && $fungsional > 0 ? round(min(999, $tanam / $fungsional * 100), 1) : null,
+            'foto' => $foto,
+            'foto_laporan' => $foto->isEmpty() ? collect($konteks['foto'][$s->id] ?? [])->values() : [],
+            'jumlah_petak' => $tersier->count(), 'luas_petak' => round((float) $tersier->sum('luas_layanan_ha'), 2),
+            'jumlah_pintu' => $pintu->count(),
+            'bangunan' => ['total' => $bangunan->count(), 'baik' => $kondisiB['baik'] ?? 0, 'rusak' => ($kondisiB['rusak_ringan'] ?? 0) + ($kondisiB['rusak_sedang'] ?? 0) + ($kondisiB['rusak_berat'] ?? 0)],
+            'p3a' => $s->p3a->pluck('nama')->values(),
+            'lat' => $s->lat, 'lng' => $s->lng, 'geometri' => $s->geometri ?: null, 'titik' => $titik,
+            'url' => $internal && auth()->user()?->can('kelola-master') ? route('master.sub.edit', $s) : null,
             'status' => $st, 'status_label' => StatusKondisi::label($st), 'warna' => StatusKondisi::WARNA[$st],
             'laporan' => $l ? [
                 'tanggal' => $l->tanggal->translatedFormat('d M Y'),
@@ -295,7 +377,7 @@ class DetailDiService
             ->sortBy(fn ($b) => [$urut[$b->jenis] ?? 99, $b->nama])
             ->map(fn (Bangunan $b) => [
                 'id' => $b->id, 'nama' => $b->nama, 'jenis' => $b->jenis_label, 'lokasi' => $b->lokasi,
-                'sub' => $b->subDaerahIrigasi?->nama,
+                'sub' => $b->subDaerahIrigasi?->nama, 'sub_id' => $b->sub_daerah_irigasi_id,
                 'kondisi' => $b->kondisi, 'kondisi_label' => $b->kondisi_label, 'warna' => $b->warna_kondisi,
                 'kondisi_per' => $b->kondisi_per?->translatedFormat('d M Y'),
                 'keterangan' => $b->keterangan,

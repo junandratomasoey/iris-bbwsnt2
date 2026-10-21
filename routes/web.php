@@ -82,6 +82,8 @@ Route::middleware(['auth', 'siap'])->group(function () {
         Route::resource('daerah-irigasi', DaerahIrigasiController::class)->parameters(['daerah-irigasi' => 'di']);
         Route::resource('daerah-irigasi.sub', SubDaerahIrigasiController::class)
             ->parameters(['daerah-irigasi' => 'di', 'sub' => 'sub'])->except(['index', 'show'])->shallow();
+        Route::post('sub/{sub}/foto', [SubDaerahIrigasiController::class, 'fotoStore'])->name('sub.foto.store');
+        Route::delete('sub/{sub}/foto/{foto}', [SubDaerahIrigasiController::class, 'fotoDestroy'])->name('sub.foto.destroy');
         Route::post('daerah-irigasi/{di}/skema', [MasterPintuAirController::class, 'skemaStore'])->name('skema.store');
         Route::delete('skema/{skema}', [MasterPintuAirController::class, 'skemaDestroy'])->name('skema.destroy');
         Route::get('pintu-air/impor', [ImporPintuController::class, 'form'])->name('pintu-air.impor');

@@ -1,13 +1,16 @@
 {{-- Panel detail D.I. (bagian dari komponen peta). Variabel: $internal --}}
 <div class="sticky top-0 z-20 flex items-center justify-between gap-2 border-b border-savana-line bg-white/95 px-2 py-1.5 backdrop-blur">
-    <button type="button" @click="tutupDetail()" class="flex items-center gap-1 rounded px-2 py-1.5 text-sm font-semibold text-saluran-700 hover:bg-savana">
-        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg> Semua D.I.
+    <button type="button" @click="subAktif ? tutupSub() : tutupDetail()" class="flex min-w-0 items-center gap-1 rounded px-2 py-1.5 text-sm font-semibold text-saluran-700 hover:bg-savana">
+        <svg class="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+        <span class="truncate" x-text="subAktif ? 'D.I. ' + (diPilih?.nama || '') : 'Semua D.I.'">Semua D.I.</span>
     </button>
     <button type="button" @click="panel = false" class="flex items-center gap-1 rounded px-2 py-1.5 text-sm font-medium text-basalt-soft hover:bg-savana" title="Sembunyikan panel"><span class="lg:hidden">Lihat peta</span><span class="hidden lg:inline">Sembunyikan</span><x-ikon n="tutup" class="h-4 w-4"/></button>
 </div>
 
+@include('peta._detail-sub')
+
 <template x-if="diPilih">
-<div class="border-b border-savana-line p-4">
+<div class="border-b border-savana-line p-4" x-show="!subAktif">
     <p class="text-xs font-medium uppercase tracking-wide text-basalt-mute" x-text="[diPilih.kode, diPilih.kabupaten, diPilih.satgas ? 'Satgas ' + diPilih.satgas : null].filter(Boolean).join(' · ')"></p>
     <h2 class="font-gauge text-[26px] font-semibold leading-tight" x-text="'D.I. ' + diPilih.nama"></h2>
     <div class="mt-1.5 flex flex-wrap items-center gap-2 text-xs">
@@ -36,6 +39,17 @@
         <div class="bg-white px-3 py-2"><dt class="text-[11px] text-basalt-soft" x-text="modeRekap ? 'Tanaman kekeringan (puncak)' : 'Tanaman kekeringan'">Tanaman kekeringan</dt><dd class="font-gauge text-xl font-semibold leading-tight" :class="diPilih.luas_kering_ha > 0 && 'text-status-siaga'"><span x-text="fmt(diPilih.luas_kering_ha, 1)"></span> <span class="text-xs font-normal">Ha</span></dd></div>
         <div class="bg-white px-3 py-2"><dt class="text-[11px] text-basalt-soft" x-text="modeRekap ? 'Puso (puncak)' : 'Puso'">Puso</dt><dd class="font-gauge text-xl font-semibold leading-tight" :class="diPilih.luas_puso_ha > 0 && 'text-status-kritis'"><span x-text="fmt(diPilih.luas_puso_ha, 1)"></span> <span class="text-xs font-normal">Ha</span></dd></div>
     </dl>
+    {{-- luas fungsional vs luas tertanam (laporan PPA 7 hari terakhir) --}}
+    <template x-if="detail && detail.teknis">
+        <div class="mt-2 rounded-md border border-savana-line px-3 py-2 text-xs">
+            <div class="flex items-baseline justify-between gap-2">
+                <span class="font-semibold">Fungsional · tertanam</span>
+                <span class="text-basalt-soft"><b class="text-basalt" x-text="fmt(diFungsional)"></b> Ha · <b class="text-basalt" x-text="diTertanam === null ? '–' : fmt(diTertanam, 1)"></b> Ha<span x-show="persen(diTertanam, diFungsional) !== null" x-text="` (${fmt(persen(diTertanam, diFungsional), 1)}%)`"></span></span>
+            </div>
+            <div class="mt-1.5 h-2 overflow-hidden rounded-sm bg-savana-deep"><div class="h-full bg-[#4E8A2E]" :style="`width:${Math.min(100, persen(diTertanam, diFungsional) || 0)}%`"></div></div>
+            <p class="mt-1 text-[11px] text-basalt-mute">Tertanam = jumlah luas tanam laporan PPA yang masih berlaku (7 hari) dari <span x-text="diPilih.sub_lapor ?? detail.sub.filter((x) => x.laporan).length"></span> Sub-D.I.</p>
+        </div>
+    </template>
 </div>
 </template>
 
@@ -43,7 +57,7 @@
 <div x-show="detailGalat" x-cloak class="m-4 rounded-md bg-[#FBECEA] px-3 py-2 text-sm text-[#7E1A14]"><span x-text="detailGalat"></span> <button type="button" class="font-semibold underline" @click="bukaDetail(detailId, { terbang: false })">Coba lagi</button></div>
 
 <template x-if="detail">
-<div>
+<div x-show="!subAktif">
     {{-- laporan Manager Air terakhir (berlaku 7 hari) --}}
     <section class="border-b border-savana-line px-4 py-3 text-xs" aria-label="Bendung, intake dan saluran primer">
         <div class="flex items-baseline justify-between gap-2">
@@ -93,11 +107,11 @@
 
     {{-- tab --}}
     <div class="sticky top-[45px] z-10 flex overflow-x-auto border-b border-savana-line bg-white px-1" role="tablist">
-        @foreach(['foto' => 'Foto', 'sub' => 'Sub-D.I.'] + ($internal ? ['pintu' => 'Pintu'] : []) + ['infra' => 'Infrastruktur', 'kejadian' => 'Kejadian'] as $k => $l)
+        @foreach(['foto' => 'Foto', 'sub' => 'Sub-D.I.'] + ($internal ? ['pintu' => 'Pintu'] : []) + ['infra' => 'Infrastruktur', 'kejadian' => 'Kejadian', 'teknis' => 'Data teknis'] as $k => $l)
             <button type="button" role="tab" :aria-selected="detailTab === '{{ $k }}'" @click="detailTab = '{{ $k }}'"
                     :class="detailTab === '{{ $k }}' ? 'border-saluran-600 text-saluran-700' : 'border-transparent text-basalt-soft'"
                     class="-mb-px flex-1 shrink-0 whitespace-nowrap border-b-2 px-1.5 py-2 text-[13px] font-semibold">{{ $l }}
-                <span class="ml-0.5 rounded-full bg-savana-deep px-1 text-[11px]" x-text="{ foto: jumlahFoto, sub: detail.sub.length, pintu: (detail.pintu || []).length, infra: detail.bangunan.length, kejadian: detail.kejadian.length }['{{ $k }}']"></span></button>
+                @if($k !== 'teknis')<span class="ml-0.5 rounded-full bg-savana-deep px-1 text-[11px]" x-text="{ foto: jumlahFoto, sub: detail.sub.length, pintu: (detail.pintu || []).length, infra: detail.bangunan.length, kejadian: detail.kejadian.length }['{{ $k }}']"></span>@endif</button>
         @endforeach
     </div>
 
@@ -144,33 +158,18 @@
             <li class="flex gap-3 px-4 py-3">
                 <span class="w-1.5 shrink-0 rounded-full" :style="`background:${s.warna}`"></span>
                 <div class="min-w-0 flex-1 text-xs">
-                    <div class="flex items-baseline justify-between gap-2">
-                        <p class="truncate text-sm font-semibold" x-text="s.nama"></p>
-                        <span class="shrink-0 font-semibold" :style="`color:${s.status === 'kosong' ? '#4A585E' : s.warna}`" x-text="s.status_label"></span>
-                    </div>
-                    <p class="text-basalt-mute" x-text="[s.lokasi, fmt(s.luas_ha) + ' Ha'].filter(Boolean).join(' · ')"></p>
-                    <template x-if="s.laporan">
-                        <div class="mt-1 text-basalt-soft">
-                            <p x-text="[s.laporan.tanggal, s.laporan.kondisi ? 'saluran ' + String(s.laporan.kondisi).toLowerCase() : null, s.laporan.kekurangan_air ? s.laporan.kekurangan_air + ' petak kurang air' : null].filter(Boolean).join(' · ')"></p>
-                            <p x-show="s.laporan.komoditas" x-text="s.laporan.komoditas"></p>
-                            <p>Tanam <b class="text-basalt" x-text="fmt(s.laporan.tanam, 1)"></b> · kering <b class="text-basalt" x-text="fmt(s.laporan.kering, 1)"></b><span x-show="s.laporan.puso"> · puso <b class="text-basalt" x-text="fmt(s.laporan.puso, 1)"></b></span> Ha</p>
-                            @if($internal)<p x-show="!(s.laporan.petak || []).length && s.laporan.debit !== null">Debit <b class="text-basalt" x-text="fmt(s.laporan.debit, 1)"></b> L/dt · TMA <b class="text-basalt" x-text="fmt(s.laporan.tma, 1)"></b> cm · <a :href="s.laporan.url" class="font-semibold text-saluran-600">Laporan</a></p>@endif
-                            <template x-if="(s.laporan.petak || []).length">
-                                <ul class="mt-1.5 space-y-1 border-l-2 border-savana-line pl-2">
-                                    <template x-for="pt in s.laporan.petak" :key="pt.kode || 'sub'">
-                                        <li class="flex items-baseline justify-between gap-2">
-                                            <span><span class="mr-1 inline-block h-2 w-2 rounded-full" :style="`background:${pt.warna}`"></span><b class="text-basalt" x-text="pt.kode ? 'Petak ' + pt.kode : (pt.nama || 'Seluruh Sub-D.I.')"></b>
-                                                <span x-text="` · ${pt.tanggal}` + (pt.jenis ? ` · ${pt.jenis}` : '') + (pt.umur !== null && pt.umur !== undefined ? ` ${pt.umur} HST` : '') + (pt.kecukupan ? ` · air ${pt.kecukupan}` : '') + ` · kering ${fmt(pt.kering, 1)}/${fmt(pt.tanam, 1)} Ha` + (pt.puso ? ` · puso ${fmt(pt.puso, 1)}` : '')" :title="pt.kecukupan_label || ''"></span>
-                                                @if($internal)<a :href="pt.url" class="font-semibold text-saluran-600">Laporan</a>@endif
-                                            </span>
-                                            <span class="shrink-0 font-semibold" :style="`color:${pt.warna}`" x-text="pt.status_label"></span>
-                                        </li>
-                                    </template>
-                                </ul>
-                            </template>
-                        </div>
-                    </template>
-                    <p x-show="!s.laporan" class="mt-1 text-basalt-mute">Belum ada laporan PPA 7 hari terakhir.</p>
+                    <button type="button" @click="bukaSub(s)" class="group flex w-full items-start gap-2 text-left" :aria-label="'Buka keterangan Sub-D.I. ' + s.nama">
+                        <template x-if="(s.foto[0] || s.foto_laporan[0])"><img :src="(s.foto[0] || s.foto_laporan[0]).kecil" alt="" loading="lazy" class="h-11 w-14 shrink-0 rounded object-cover"></template>
+                        <span class="min-w-0 flex-1">
+                            <span class="flex items-baseline justify-between gap-2">
+                                <span class="truncate text-sm font-semibold text-saluran-700 group-hover:underline" x-text="s.nama"></span>
+                                <span class="shrink-0 font-semibold" :style="`color:${s.status === 'kosong' ? '#4A585E' : s.warna}`" x-text="s.status_label"></span>
+                            </span>
+                            <span class="block text-basalt-mute" x-text="[s.kecamatan ? 'Kec. ' + s.kecamatan : s.lokasi, fmt(s.luas_fungsional_ha ?? s.luas_ha) + ' Ha' + (s.luas_fungsional_ha !== null ? ' fungsional' : ''), s.persen_tertanam !== null ? 'tertanam ' + fmt(s.persen_tertanam, 0) + '%' : null].filter(Boolean).join(' · ')"></span>
+                            <span class="block font-semibold text-saluran-600">Lihat Sub-D.I. & arahkan peta ›</span>
+                        </span>
+                    </button>
+                    @include('peta._kondisi-sub')
                     @if($internal)
                         <div x-show="s.petugas.length" class="mt-1.5 flex flex-wrap gap-1">
                             <template x-for="p in s.petugas.slice(0, 4)" :key="p.nama">
@@ -274,21 +273,6 @@
         <li x-show="!detail.kejadian.length" class="px-4 py-8 text-center text-sm text-basalt-soft">Tidak ada catatan kejadian kekeringan.</li>
     </ul>
 
-    {{-- profil teknis --}}
-    <details class="group border-t border-savana-line px-4 py-3 text-sm">
-        <summary class="cursor-pointer select-none font-semibold">Data teknis D.I.</summary>
-        <dl class="mt-2 space-y-1 text-xs">
-            <div class="flex justify-between"><dt class="text-basalt-soft">Luas Permen</dt><dd><span x-text="fmt(detail.di.luas.permen)"></span> Ha</dd></div>
-            <div class="flex justify-between"><dt class="text-basalt-soft">Luas baku</dt><dd><span x-text="fmt(detail.di.luas.baku)"></span> Ha</dd></div>
-            <div class="flex justify-between"><dt class="text-basalt-soft">Luas fungsional</dt><dd><span x-text="fmt(detail.di.luas.fungsional)"></span> Ha</dd></div>
-            <div class="flex justify-between"><dt class="text-basalt-soft">Luas potensial</dt><dd><span x-text="fmt(detail.di.luas.potensial)"></span> Ha</dd></div>
-            <div class="flex justify-between"><dt class="text-basalt-soft">Kewenangan</dt><dd x-text="detail.di.kewenangan || '–'"></dd></div>
-            <div x-show="detail.di.sumber_air" class="flex justify-between gap-4"><dt class="text-basalt-soft">Sumber air</dt><dd class="text-right" x-text="detail.di.sumber_air"></dd></div>
-            <div x-show="detail.di.keterangan" class="flex justify-between gap-4"><dt class="text-basalt-soft">Keterangan</dt><dd class="text-right" x-text="detail.di.keterangan"></dd></div>
-            <div x-show="detail.di.tenaga_op.length" class="flex justify-between gap-4"><dt class="text-basalt-soft">Tenaga O&amp;P</dt><dd class="text-right" x-text="detail.di.tenaga_op.map((t) => t.label + ' ' + t.n).join(', ')"></dd></div>
-            <div x-show="detail.p3a.length" class="flex justify-between gap-4"><dt class="shrink-0 text-basalt-soft" x-text="`P3A (${detail.p3a.length})`"></dt><dd class="text-right" x-text="detail.p3a.join(', ')"></dd></div>
-        </dl>
-        @if($internal)<a x-show="detail.di.url" :href="detail.di.url" class="mt-3 inline-block text-sm font-semibold text-saluran-600">Buka profil D.I. lengkap</a>@endif
-    </details>
+    @include('peta._teknis-di')
 </div>
 </template>
