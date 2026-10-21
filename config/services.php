@@ -2,6 +2,12 @@
 
 return [
 
+    // token untuk mengunduh cadangan terbaru dari laptop/NAS kantor (menu Cadangan data); kosong = nonaktif
+    'cadangan' => [
+        'token' => env('CADANGAN_TOKEN'),
+        'folder' => env('CADANGAN_FOLDER'), // kosong = storage/app/cadangan
+    ],
+
     /*
     |--------------------------------------------------------------------------
     | Third Party Services

@@ -15,6 +15,14 @@
 
 <x-pilih-periode :periode="$periode" rute="dashboard" class="mb-5"/>
 
+@if($pengingat && ($pengingat['ppa_belum'] || $pengingat['air_belum']))
+    <a href="{{ route('pengingat') }}" class="mb-5 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[#E8C9B4] bg-[#FDF3EC] px-4 py-3 text-sm hover:bg-[#FBE8DC]">
+        <span class="flex items-center gap-2"><x-ikon n="lonceng" class="h-5 w-5 text-[#8A3510]"/>
+            <span><b>Pengingat laporan pekan ini:</b> {{ $pengingat['ppa_belum'] }} dari {{ $pengingat['ppa_total'] }} PPA dan {{ $pengingat['air_belum'] }} dari {{ $pengingat['di_total'] }} D.I. (laporan Manager Air) belum melapor.</span></span>
+        <span class="font-semibold text-saluran-700">Ingatkan lewat WhatsApp ›</span>
+    </a>
+@endif
+
 {{-- papan duga --}}
 <section class="panel p-5" aria-labelledby="judul-status">
     <div class="flex flex-wrap items-baseline justify-between gap-2">

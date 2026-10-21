@@ -5,6 +5,7 @@
     @if($kelola)
         <a href="{{ route('master.pintu-air.create', ['di' => $di->id]) }}" class="btn-ghost"><x-ikon n="pintu" class="h-4 w-4"/> Tambah pintu</a>
         <a href="{{ route('master.pintu-air.penugasan', ['di' => $di->id]) }}" class="btn-ghost"><x-ikon n="petugas" class="h-4 w-4"/> Penugasan</a>
+        <a href="{{ route('master.pintu-air.impor', ['di' => $di->id]) }}" class="btn-ghost"><x-ikon n="unduh" class="h-4 w-4"/> Impor Excel</a>
     @endif
 </x-judul>
 

@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AuditController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\CadanganController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\HakAksesController;
 use App\Http\Controllers\KejadianController;
@@ -9,13 +10,15 @@ use App\Http\Controllers\LaporanAirController;
 use App\Http\Controllers\LaporanHarianController;
 use App\Http\Controllers\Master\BangunanController;
 use App\Http\Controllers\Master\DaerahIrigasiController;
+use App\Http\Controllers\Master\ImporPintuController;
 use App\Http\Controllers\Master\JadwalTanamController;
 use App\Http\Controllers\Master\P3aController;
 use App\Http\Controllers\Master\PetaDiController;
-use App\Http\Controllers\Master\SubDaerahIrigasiController;
 use App\Http\Controllers\Master\PintuAirController as MasterPintuAirController;
+use App\Http\Controllers\Master\SubDaerahIrigasiController;
 use App\Http\Controllers\PembacaanPintuController;
 use App\Http\Controllers\PenggunaController;
+use App\Http\Controllers\PengingatController;
 use App\Http\Controllers\PetaController;
 use App\Http\Controllers\PetugasController;
 use App\Http\Controllers\PintuAirController;
@@ -26,6 +29,9 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', [PetaController::class, 'publik'])->name('beranda');
 Route::get('/api/publik/peta', [PetaController::class, 'dataPublik'])->name('api.publik.peta')->middleware('throttle:60,1');
 Route::get('/api/publik/di/{di}', [PetaController::class, 'detailPublik'])->name('api.publik.di')->middleware('throttle:120,1');
+
+// cadangan terbaru untuk laptop/NAS kantor (token di header; nonaktif bila CADANGAN_TOKEN kosong)
+Route::get('/cadangan-terbaru', [CadanganController::class, 'ambil'])->name('cadangan.ambil')->middleware('throttle:10,1');
 
 Route::middleware('guest')->group(function () {
     Route::get('/login', [AuthController::class, 'create'])->name('login');
@@ -78,6 +84,10 @@ Route::middleware(['auth', 'siap'])->group(function () {
             ->parameters(['daerah-irigasi' => 'di', 'sub' => 'sub'])->except(['index', 'show'])->shallow();
         Route::post('daerah-irigasi/{di}/skema', [MasterPintuAirController::class, 'skemaStore'])->name('skema.store');
         Route::delete('skema/{skema}', [MasterPintuAirController::class, 'skemaDestroy'])->name('skema.destroy');
+        Route::get('pintu-air/impor', [ImporPintuController::class, 'form'])->name('pintu-air.impor');
+        Route::get('pintu-air/impor/{di}/template', [ImporPintuController::class, 'template'])->name('pintu-air.impor.template');
+        Route::post('pintu-air/impor/{di}', [ImporPintuController::class, 'periksa'])->name('pintu-air.impor.periksa');
+        Route::post('pintu-air/impor/{di}/terapkan', [ImporPintuController::class, 'terapkan'])->name('pintu-air.impor.terapkan');
         Route::get('pintu-air/penugasan', [MasterPintuAirController::class, 'penugasan'])->name('pintu-air.penugasan');
         Route::post('pintu-air/penugasan', [MasterPintuAirController::class, 'simpanPenugasan'])->name('pintu-air.penugasan.simpan');
         Route::resource('pintu-air', MasterPintuAirController::class)->parameters(['pintu-air' => 'pintu'])->except(['index', 'show']);
@@ -105,5 +115,14 @@ Route::middleware(['auth', 'siap'])->group(function () {
         Route::delete('/pengecualian/{pengecualian}', [HakAksesController::class, 'hapusPengecualian'])->name('pengecualian.destroy');
     });
 
+    Route::get('/pengingat', PengingatController::class)->name('pengingat');
     Route::get('/audit', AuditController::class)->name('audit')->middleware('can:lihat-audit');
+
+    Route::middleware('can:kelola-hak-akses')->prefix('cadangan')->name('cadangan.')->group(function () {
+        Route::get('/', [CadanganController::class, 'index'])->name('index');
+        Route::post('/', [CadanganController::class, 'store'])->name('store');
+        Route::get('/skrip', [CadanganController::class, 'skrip'])->name('skrip');
+        Route::get('/unduh/{nama}', [CadanganController::class, 'unduh'])->name('unduh');
+        Route::delete('/{nama}', [CadanganController::class, 'destroy'])->name('destroy');
+    });
 });

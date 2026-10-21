@@ -7,6 +7,7 @@
         ['laporan.index', 'Laporan', 'laporan', true],
         ['pintu.index', 'Pintu air', 'pintu', true],
         ['kejadian.index', 'Kejadian kekeringan', 'kejadian', true],
+        ['pengingat', 'Pengingat laporan', 'lonceng', $u->can('lihat-petugas')],
         ['petugas.index', 'Kontak petugas', 'petugas', $u->can('lihat-petugas') || $u->can('kelola-petugas')],
         ['master.daerah-irigasi.index', 'Daerah irigasi', 'di', true],
         ['master.bangunan.index', 'Infrastruktur', 'bangunan', $u->can('lihat-master')],
@@ -16,6 +17,7 @@
         ['pengguna.index', 'Pengguna', 'pengguna', $u->can('kelola-pengguna')],
         ['hak-akses.index', 'Hak akses', 'kunci', $u->can('kelola-hak-akses')],
         ['audit', 'Log aktivitas', 'audit', $u->can('lihat-audit')],
+        ['cadangan.index', 'Cadangan data', 'unduh', $u->can('kelola-hak-akses')],
     ];
 @endphp
 <!DOCTYPE html>

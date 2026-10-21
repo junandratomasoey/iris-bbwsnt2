@@ -11,6 +11,7 @@ use App\Models\PintuAir;
 use App\Models\SubDaerahIrigasi;
 use App\Models\WilayahSatgas;
 use App\Services\KondisiService;
+use App\Services\PengingatService;
 use App\Services\PintuService;
 use App\Services\RekapService;
 use App\Support\Periode;
@@ -103,8 +104,10 @@ class DashboardController extends Controller
         $svcPintu = app(PintuService::class);
         $pintu = $svcPintu->hitung($svcPintu->daftar($subIds, null, 2));
 
+        $pengingat = $user->can('lihat-petugas') ? app(PengingatService::class)->pekan(today(), $subIds)['ringkas'] : null;
+
         return view('dashboard.index', compact(
-            'pintu', 'airHariIni', 'totalDi', 'ringkasan', 'perStatus', 'luasPerStatus', 'totalSub', 'laporHariIni', 'kritis', 'kepatuhan', 'menunggu', 'kejadian', 'hari', 'periode'
+            'pengingat', 'pintu', 'airHariIni', 'totalDi', 'ringkasan', 'perStatus', 'luasPerStatus', 'totalSub', 'laporHariIni', 'kritis', 'kepatuhan', 'menunggu', 'kejadian', 'hari', 'periode'
         ));
     }
 }
